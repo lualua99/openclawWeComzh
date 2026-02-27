@@ -203,10 +203,12 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         typingCallbacks.onIdle?.();
       },
       onIdle: async () => {
+        params.runtime.log?.(`feishu[${account.accountId}]: reply idle`);
         await closeStreaming();
         typingCallbacks.onIdle?.();
       },
       onCleanup: () => {
+        params.runtime.log?.(`feishu[${account.accountId}]: reply cleanup`);
         typingCallbacks.onCleanup?.();
       },
     });
@@ -216,11 +218,33 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
     replyOptions: {
       ...replyOptions,
       onModelSelected: prefixContext.onModelSelected,
+      onReasoningStream: async (payload: ReplyPayload) => {
+        if (!streamingEnabled || !payload.text) {
+          return;
+        }
+        params.runtime.log?.(
+          `feishu[${account.accountId}]: reasoning stream received (${payload.text.length} chars)`,
+        );
+        // For reasoning stream, we typically want to show it on the card
+        // but not necessarily update streamText if it's separate from content
+        startStreaming();
+        if (streamingStartPromise) {
+          await streamingStartPromise;
+        }
+        if (streaming?.isActive()) {
+          // If the model provides delta reasoning, we append it to a "Thinking" section
+          // For now, just trigger an update to show activity
+          await streaming.update(`⏳ ${payload.text}`);
+        }
+      },
       onPartialReply: streamingEnabled
         ? (payload: ReplyPayload) => {
             if (!payload.text || payload.text === lastPartial) {
               return;
             }
+            params.runtime.log?.(
+              `feishu[${account.accountId}]: partial reply received (${payload.text.length} chars)`,
+            );
             lastPartial = payload.text;
             streamText = payload.text;
             partialUpdateQueue = partialUpdateQueue.then(async () => {

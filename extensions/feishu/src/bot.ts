@@ -673,6 +673,9 @@ export async function handleFeishuMessage(params: {
       }
       return;
     }
+    log(
+      `feishu[${account.accountId}]: P2P check passed for ${ctx.senderOpenId} (dmAllowed=${dmAllowed})`,
+    );
 
     const commandAllowFrom = isGroup ? (groupConfig?.allowFrom ?? []) : effectiveDmAllowFrom;
     const senderAllowedForCommands = resolveFeishuAllowlistMatch({
@@ -956,6 +959,10 @@ export async function handleFeishuMessage(params: {
       dispatcher,
       replyOptions,
     });
+
+    log(
+      `feishu[${account.accountId}]: dispatch complete (queuedFinal=${queuedFinal}, counts=${JSON.stringify(counts)}, session=${route.sessionKey})`,
+    );
 
     markDispatchIdle();
 

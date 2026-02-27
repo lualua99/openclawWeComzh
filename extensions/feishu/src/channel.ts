@@ -332,6 +332,8 @@ export const feishuPlugin: ChannelPlugin<ResolvedFeishuAccount> = {
       lastStopAt: runtime?.lastStopAt ?? null,
       lastError: runtime?.lastError ?? null,
       port: runtime?.port ?? null,
+      lastInboundAt: runtime?.lastInboundAt ?? null,
+      lastOutboundAt: runtime?.lastOutboundAt ?? null,
       probe,
     }),
   },

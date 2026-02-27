@@ -111,6 +111,7 @@ export class FeishuStreamingSession {
       data?: { card_id: string };
     };
     if (createData.code !== 0 || !createData.data?.card_id) {
+      this.log?.(`Create card failed: [${createData.code}] ${createData.msg}`);
       throw new Error(`Create card failed: ${createData.msg}`);
     }
     const cardId = createData.data.card_id;
@@ -125,6 +126,7 @@ export class FeishuStreamingSession {
       },
     });
     if (sendRes.code !== 0 || !sendRes.data?.message_id) {
+      this.log?.(`Send card failed: [${sendRes.code}] ${sendRes.msg}`);
       throw new Error(`Send card failed: ${sendRes.msg}`);
     }
 
