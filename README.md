@@ -20,7 +20,17 @@
 
 [Website](https://openclaw.ai) · [Docs](https://docs.openclaw.ai) · [Vision](VISION.md) · [DeepWiki](https://deepwiki.com/openclaw/openclaw) · [Getting Started](https://docs.openclaw.ai/start/getting-started) · [Updating](https://docs.openclaw.ai/install/updating) · [Showcase](https://docs.openclaw.ai/start/showcase) · [FAQ](https://docs.openclaw.ai/help/faq) · [Wizard](https://docs.openclaw.ai/start/wizard) · [Nix](https://github.com/openclaw/nix-openclaw) · [Docker](https://docs.openclaw.ai/install/docker) · [Discord](https://discord.gg/clawd)
 
-🎉 **v2026.2.x 核心里程碑**
+🎉 **v2026.3.x 核心里程碑 (重磅发布)**
+_[开源仓库主页：luolin-ai/openclawWeComzh](https://github.com/luolin-ai/openclawWeComzh)_
+
+- 🦞 **Sandbox 自动化工作流编排**：从传统的“被动问答对话框”进化为“主动派单工作台”。只需下发宏大目标，AI 即可拆解目标并生成 `task.md` 规划清单，每执行一步（如修改代码、查阅文档、执行计算）都会自我打卡标记状态。全面引入对高危终端命令的弹窗拦截审核机制（Human-in-the-loop）。
+- 🤖 **Multi-Agent 多智能体协同作战**：引入了基于网关的子智能体分发调度大盘。你可以通过主智能体下发诸如“请派一个助手帮我在后台静默编译测试”的指令，分离线程并行工作流，全程免打扰。
+- 🧠 **本地私有知识库引擎挂载**：在多轮跨会话之间建立长线上下文记忆。直接让 AI 挂载本地开源项目文档和专属代码规范库，在遇到技术卡点时，它能像人类研发一样自主翻阅学习资料寻找突破。
+- 💻 **沉浸式中文 UI 控制台与交互体系大修**：全面更新大盘页面：整合即开即用的 CLI 终端指令 (`openclaw dashboard`) 和全高分辨率多模块前端总览，极大贴合国内研发习惯。
+
+---
+
+🎉 **v2026.2.x 历史核心里程碑**
 
 - 🧠 **Qwen / DeepSeek 流式深度整合**：
   - **思考过程全解析**：彻底修复了 Qwen-Web 和 DeepSeek 模型在输出深度推理标签 (`[(deep_think)]` / `<think>`) 时的截断或溢出问题。流式输出期间，UI 界面将优雅且平滑地展开“深度思考中 (Deep Thinking...)”折叠面板，展现 AI 推理全貌。
