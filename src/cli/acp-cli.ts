@@ -101,7 +101,7 @@ export function registerAcpCli(program: Command) {
       const inheritedVerbose = inheritOptionFromParent<boolean>(command, "verbose");
       try {
         const { loadConfig } = await import("../config/config.js");
-        const config = await loadConfig();
+        const config = loadConfig();
         await runAcpClientInteractive({
           cwd: opts.cwd as string | undefined,
           serverCommand: opts.server as string | undefined,
