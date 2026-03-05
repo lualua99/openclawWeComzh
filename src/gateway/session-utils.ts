@@ -834,6 +834,7 @@ export function listSessionsFromStore(params: {
         sessionId: entry?.sessionId,
         systemSent: entry?.systemSent,
         abortedLastRun: entry?.abortedLastRun,
+        needsHelp: entry?.needsHelp,
         thinkingLevel: entry?.thinkingLevel,
         verboseLevel: entry?.verboseLevel,
         reasoningLevel: entry?.reasoningLevel,

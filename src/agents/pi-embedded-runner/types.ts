@@ -74,6 +74,8 @@ export type EmbeddedPiRunResult = {
   messagingToolSentTargets?: MessagingToolSend[];
   // Count of successful cron.add tool calls in this run.
   successfulCronAdds?: number;
+  // Indicates if the agent has encountered consecutive errors and needs human intervention.
+  needsHelp?: boolean;
 };
 
 export type EmbeddedPiCompactResult = {

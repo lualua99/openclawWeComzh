@@ -205,6 +205,8 @@ export const agentHandlers: GatewayRequestHandlers = {
       label?: string;
       spawnedBy?: string;
       inputProvenance?: InputProvenance;
+      tools?: string[];
+      skills?: string[];
     };
     const senderIsOwner = resolveSenderIsOwnerFromClient(client);
     const cfg = loadConfig();
@@ -634,6 +636,8 @@ export const agentHandlers: GatewayRequestHandlers = {
         internalEvents: request.internalEvents,
         inputProvenance,
         senderIsOwner,
+        toolsOverride: request.tools,
+        skillsOverride: request.skills,
       },
       defaultRuntime,
       context.deps,

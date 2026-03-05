@@ -87,6 +87,8 @@ type ModelCatalogRpcEntry = {
   name: string;
   provider: string;
   contextWindow?: number;
+  input?: string[];
+  reasoning?: boolean;
 };
 
 type PiCatalogFixtureEntry = {
@@ -132,6 +134,46 @@ const expectedSortedCatalog = (): ModelCatalogRpcEntry[] => [
     contextWindow: 1000,
   },
   {
+    "contextWindow": 64000,
+    "id": "deepseek-reasoner-search",
+    "input": [
+      "text"
+    ],
+    "name": "DeepSeek R1 (Web + Search)",
+    "provider": "deepseek-web",
+    "reasoning": true
+  },
+  {
+    "contextWindow": 64000,
+    "id": "deepseek-reasoner",
+    "input": [
+      "text"
+    ],
+    "name": "DeepSeek R1 (Web)",
+    "provider": "deepseek-web",
+    "reasoning": true
+  },
+  {
+    "contextWindow": 64000,
+    "id": "deepseek-chat-search",
+    "input": [
+      "text"
+    ],
+    "name": "DeepSeek V3 (Web + Search)",
+    "provider": "deepseek-web",
+    "reasoning": false
+  },
+  {
+    "contextWindow": 64000,
+    "id": "deepseek-chat",
+    "input": [
+      "text"
+    ],
+    "name": "DeepSeek V3 (Web)",
+    "provider": "deepseek-web",
+    "reasoning": false
+  },
+  {
     id: "gpt-test-a",
     name: "A-Model",
     provider: "openai",
@@ -142,6 +184,56 @@ const expectedSortedCatalog = (): ModelCatalogRpcEntry[] => [
     name: "gpt-test-z",
     provider: "openai",
   },
+  {
+    "contextWindow": 128000,
+    "id": "Qwen3.5-Plus",
+    "input": [
+      "text"
+    ],
+    "name": "Qwen 3.5 Plus (Web)",
+    "provider": "qwen-web",
+    "reasoning": false
+  },
+  {
+    "contextWindow": 128000,
+    "id": "Qwen3.5-Plus-Thinking",
+    "input": [
+      "text"
+    ],
+    "name": "Qwen 3.5 Plus Thinking (Web)",
+    "provider": "qwen-web",
+    "reasoning": true
+  },
+  {
+    "contextWindow": 128000,
+    "id": "Qwen-Code-Agent",
+    "input": [
+      "text"
+    ],
+    "name": "Qwen Code Assistant (Web)",
+    "provider": "qwen-web",
+    "reasoning": false
+  },
+  {
+    "contextWindow": 128000,
+    "id": "Qwen-Deep-Research",
+    "input": [
+      "text"
+    ],
+    "name": "Qwen Deep Research (Web)",
+    "provider": "qwen-web",
+    "reasoning": true
+  },
+  {
+    "contextWindow": 128000,
+    "id": "Qwen-Image-Gen",
+    "input": [
+      "text"
+    ],
+    "name": "Qwen Image Generation (Web)",
+    "provider": "qwen-web",
+    "reasoning": false
+  }
 ];
 
 describe("gateway server models + voicewake", () => {

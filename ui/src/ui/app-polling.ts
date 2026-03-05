@@ -2,11 +2,13 @@ import type { OpenClawApp } from "./app.ts";
 import { loadDebug } from "./controllers/debug.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
+import { loadSandboxTaskPlan } from "./controllers/sandbox.ts";
 
 type PollingHost = {
   nodesPollInterval: number | null;
   logsPollInterval: number | null;
   debugPollInterval: number | null;
+  sandboxPollTimer: number | null;
   tab: string;
 };
 
@@ -66,4 +68,24 @@ export function stopDebugPolling(host: PollingHost) {
   }
   clearInterval(host.debugPollInterval);
   host.debugPollInterval = null;
+}
+
+export function startSandboxPolling(host: PollingHost & { sessionKey: string }) {
+  if (host.sandboxPollTimer != null) {
+    return;
+  }
+  host.sandboxPollTimer = window.setInterval(() => {
+    if (host.tab !== "chat") {
+      return;
+    }
+    void loadSandboxTaskPlan(host as unknown as OpenClawApp);
+  }, 3000);
+}
+
+export function stopSandboxPolling(host: PollingHost) {
+  if (host.sandboxPollTimer == null) {
+    return;
+  }
+  clearInterval(host.sandboxPollTimer);
+  host.sandboxPollTimer = null;
 }

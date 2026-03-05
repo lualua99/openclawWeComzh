@@ -7,6 +7,7 @@ import { setProgramContext } from "./program-context.js";
 
 export function buildProgram() {
   const program = new Command();
+  program.option("-f, --force", "Force the operation (reinstall, overwrite, or bypass checks)", false);
   const ctx = createProgramContext();
   const argv = process.argv;
 

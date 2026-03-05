@@ -61,7 +61,7 @@ If the user doesn't specify images, the skill will prompt for them or proceed wi
 **Images (if provided):**
 
 1. Find the upload area (usually a "Choose File" button or drag-drop zone)
-2. For local images, use the file upload dialog: 
+2. For local images, use the file upload dialog:
    - Use `act` with kind="click" on the upload button
    - Use `act` with kind="type" on the file input to set the file path (may need to handle multiple files)
    - Or use `upload` action if available
@@ -81,11 +81,13 @@ If the user doesn't specify images, the skill will prompt for them or proceed wi
 A Python script that handles the browser automation steps above. It uses Playwright to control the browser directly, which can be more reliable than step-by-step `act` calls.
 
 **Usage:**
+
 ```bash
 python scripts/publish_xiaohongshu.py --title "标题" --body "内容" --images image1.jpg image2.jpg
 ```
 
 **Features:**
+
 - Waits for elements to load
 - Handles file uploads
 - Returns the final post URL
@@ -98,6 +100,7 @@ If this script is present, prefer using it via `exec` with pty=true for reliabil
 ### `references/page_structure.md`
 
 Contains the current DOM structure of the Xiaohongshu creator platform, updated periodically. Includes selectors for key elements:
+
 - Upload图文 button
 - Title input field
 - Body textarea
@@ -114,6 +117,7 @@ Use this reference when the script fails or when selectors need updating.
 **User:** "发小红书：标题『测试』正文：这是一条测试内容"
 
 **Skill execution:**
+
 1. Open creator platform
 2. Click "上传图文"
 3. Type title "测试"
@@ -126,6 +130,7 @@ Use this reference when the script fails or when selectors need updating.
 **User:** "小红书发布助手，标题『我的猫』正文：看看我家主子 图片：C:\\photos\\cat1.jpg, C:\\photos\\cat2.jpg"
 
 **Skill execution:**
+
 1. Same as above, but after filling text, upload both images
 2. Wait for uploads to complete
 3. Publish
@@ -135,6 +140,7 @@ Use this reference when the script fails or when selectors need updating.
 **User:** "发小红书：标题『测试』正文：测试"
 
 **If not logged in:**
+
 1. Detect login required
 2. Respond: "请先在小红书创作平台手动登录，然后告诉我继续"
 3. User logs in, says "继续"
@@ -142,12 +148,12 @@ Use this reference when the script fails or when selectors need updating.
 
 ## Error Handling
 
-| Error | Detection | Handling |
-|-------|-----------|----------|
-| Not logged in | Snapshot shows login button/prompt | Ask user to log in manually, then resume |
-| Upload failed | Script timeout or error | Retry up to 3 times, then inform user |
-| Element not found | Snapshot missing expected refs | Refresh page, if still missing, ask user to navigate manually |
-| Publish button disabled | Snapshot shows button disabled | Check for missing required fields (title/body/images) and prompt user |
+| Error                   | Detection                          | Handling                                                              |
+| ----------------------- | ---------------------------------- | --------------------------------------------------------------------- |
+| Not logged in           | Snapshot shows login button/prompt | Ask user to log in manually, then resume                              |
+| Upload failed           | Script timeout or error            | Retry up to 3 times, then inform user                                 |
+| Element not found       | Snapshot missing expected refs     | Refresh page, if still missing, ask user to navigate manually         |
+| Publish button disabled | Snapshot shows button disabled     | Check for missing required fields (title/body/images) and prompt user |
 
 ## Notes
 

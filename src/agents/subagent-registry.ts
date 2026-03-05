@@ -943,7 +943,7 @@ export function registerSubagentRun(params: {
   void waitForSubagentCompletion(params.runId, waitTimeoutMs);
 }
 
-async function waitForSubagentCompletion(runId: string, waitTimeoutMs: number) {
+export async function waitForSubagentCompletion(runId: string, waitTimeoutMs: number) {
   try {
     const timeoutMs = Math.max(1, Math.floor(waitTimeoutMs));
     const wait = await callGateway<{

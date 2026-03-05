@@ -100,12 +100,15 @@ export function registerAcpCli(program: Command) {
     .action(async (opts, command) => {
       const inheritedVerbose = inheritOptionFromParent<boolean>(command, "verbose");
       try {
+        const { loadConfig } = await import("../config/config.js");
+        const config = await loadConfig();
         await runAcpClientInteractive({
           cwd: opts.cwd as string | undefined,
           serverCommand: opts.server as string | undefined,
           serverArgs: opts.serverArgs as string[] | undefined,
           serverVerbose: Boolean(opts.serverVerbose),
           verbose: Boolean(opts.verbose || inheritedVerbose),
+          allowDangerousToolsOverride: config.tools?.allowDangerousToolsOverride,
         });
       } catch (err) {
         defaultRuntime.error(String(err));

@@ -313,6 +313,7 @@ export async function handleToolExecutionEnd(
   ctx.state.toolMetaById.delete(toolCallId);
   ctx.state.toolSummaryById.delete(toolCallId);
   if (isToolError) {
+    ctx.state.consecutiveToolErrors += 1;
     const errorMessage = extractToolErrorMessage(sanitizedResult);
     ctx.state.lastToolError = {
       toolName,
@@ -321,7 +322,9 @@ export async function handleToolExecutionEnd(
       mutatingAction: callSummary?.mutatingAction,
       actionFingerprint: callSummary?.actionFingerprint,
     };
-  } else if (ctx.state.lastToolError) {
+  } else {
+    ctx.state.consecutiveToolErrors = 0;
+    if (ctx.state.lastToolError) {
     // Keep unresolved mutating failures until the same action succeeds.
     if (ctx.state.lastToolError.mutatingAction) {
       if (
@@ -433,4 +436,5 @@ export async function handleToolExecutionEnd(
         ctx.log.warn(`after_tool_call hook failed: tool=${toolName} error=${String(err)}`);
       });
   }
+}
 }

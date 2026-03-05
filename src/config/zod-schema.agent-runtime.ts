@@ -524,6 +524,7 @@ export const AgentToolsSchema = z
       })
       .strict()
       .optional(),
+    allowDangerousToolsOverride: z.boolean().optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -775,6 +776,7 @@ export const ToolsSchema = z
       })
       .strict()
       .optional(),
+    allowDangerousToolsOverride: z.boolean().optional(),
   })
   .strict()
   .superRefine((value, ctx) => {

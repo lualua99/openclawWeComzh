@@ -41,6 +41,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     toolMetaById: new Map(),
     toolSummaryById: new Set(),
     lastToolError: undefined,
+    consecutiveToolErrors: 0,
     blockReplyBreak: params.blockReplyBreak ?? "text_end",
     reasoningMode,
     includeReasoning: reasoningMode === "on",
@@ -677,6 +678,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     // which is generated AFTER the tool sends the actual answer.
     didSendViaMessagingTool: () => messagingToolSentTexts.length > 0,
     getLastToolError: () => (state.lastToolError ? { ...state.lastToolError } : undefined),
+    getConsecutiveToolErrors: () => state.consecutiveToolErrors,
     getUsageTotals,
     getCompactionCount: () => compactionCount,
     waitForCompactionRetry: () => {

@@ -1146,7 +1146,21 @@ export async function runEmbeddedAttempt(
         blockReplyChunking: params.blockReplyChunking,
         onPartialReply: params.onPartialReply,
         onAssistantMessageStart: params.onAssistantMessageStart,
-        onAgentEvent: params.onAgentEvent,
+        onAgentEvent: (evt) => {
+          if (params.onAgentEvent) {
+             params.onAgentEvent(evt);
+          }
+          // The subscription object is captured via closure since
+          // tool result events fire asynchronously during prompt execution.
+          if (
+            evt.stream === "tool" &&
+            (evt.data)?.phase === "result" &&
+            (subscription?.getConsecutiveToolErrors() ?? 0) >= 3
+          ) {
+            log.warn(`aborting run ${params.runId} due to 3 consecutive tool errors`);
+            abortRun(false, new Error("consecutive_tool_errors"));
+          }
+        },
         enforceFinalTag: params.enforceFinalTag,
         config: params.config,
         sessionKey: params.sessionKey ?? params.sessionId,

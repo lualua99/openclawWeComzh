@@ -234,6 +234,8 @@ export function createOpenClawCodingTools(options?: {
   requireExplicitMessageTarget?: boolean;
   /** If true, omit the message tool from the tool list. */
   disableMessageTool?: boolean;
+  /** Explicit list of tools to use, ignoring the default agent policy. */
+  toolsOverride?: string[];
   /** Whether the sender is an owner (required for owner-only tools). */
   senderIsOwner?: boolean;
 }): AnyAgentTool[] {
@@ -518,6 +520,7 @@ export function createOpenClawCodingTools(options?: {
       }),
       { policy: sandbox?.tools, label: "sandbox tools.allow" },
       { policy: subagentPolicy, label: "subagent tools.allow" },
+      { policy: options?.toolsOverride ? { allow: options.toolsOverride } : undefined, label: "toolsOverride" },
     ],
   });
   // Always normalize tool JSON Schemas before handing them to pi-agent/pi-ai.

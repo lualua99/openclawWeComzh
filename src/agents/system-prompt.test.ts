@@ -218,7 +218,9 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain(
       "For long waits, avoid rapid poll loops: use exec with enough yieldMs or process(action=poll, timeout=<ms>).",
     );
-    expect(prompt).toContain("Completion is push-based: it will auto-announce when done.");
+    expect(prompt).toContain(
+      "If a task is more complex or takes longer, spawn a sub-agent via `sessions_spawn`. The tool will automatically wait",
+    );
     expect(prompt).toContain("Do not poll `subagents list` / `sessions_list` in a loop");
     expect(prompt).toContain(
       "When a first-class tool exists for an action, use the tool directly instead of asking the user to run equivalent CLI or slash commands.",

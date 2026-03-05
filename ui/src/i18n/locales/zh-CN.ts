@@ -36,6 +36,10 @@ export const zh_CN: TranslationMap = {
     config: "配置",
     debug: "调试",
     logs: "日志",
+    sandbox: "沙盘",
+    files: "文件",
+    tools: "工具",
+    knowledge: "知识库",
   },
   subtitles: {
     agents: "管理代理工作区、工具和身份。",
@@ -51,6 +55,7 @@ export const zh_CN: TranslationMap = {
     config: "安全地编辑 ~/.openclaw/openclaw.json。",
     debug: "网关快照、事件和手动 RPC 调用。",
     logs: "网关文件日志的实时追踪。",
+    sandbox: "实时编排与任务委派视图。",
   },
   overview: {
     access: {
@@ -328,4 +333,117 @@ export const zh_CN: TranslationMap = {
       nameRequiredShort: "名称为必填。",
     },
   },
+  agents: {
+    title: "智能体",
+    configured: "已配置 {count} 个。",
+    selectAgent: "请选择一个智能体",
+    selectAgentSub: "选择一个智能体以检查其工作区和工具配置。",
+    overview: {
+      title: "运行概览",
+      subtitle: "工作区路径和身份元数据。",
+      workspace: "工作区",
+      primaryModel: "主要模型",
+      identityName: "身份名称",
+      isDefault: "默认",
+      identityEmoji: "身份表情",
+      skillsFilter: "技能筛选",
+      modelSelection: "模型选择",
+      primaryModelLabel: "主要模型",
+      primaryModelDefault: "主要模型 (默认)",
+      inheritDefault: "继承默认",
+      inheritDefaultWith: "继承默认 ({model})",
+      fallbacksLabel: "备用模型 (逗号分隔)",
+      fallbacksPlaceholder: "provider/model, provider/model",
+      reloadConfig: "重新加载配置",
+      save: "保存",
+      saving: "保存中...",
+      yes: "是",
+      no: "否",
+      allSkills: "所有技能",
+      skillsSelected: "已选择 {count} 个",
+    },
+    knowledge: {
+      title: "知识库",
+      subtitle: "用于 RAG 增强和上下文注入的 Markdown 文档。",
+      refresh: "刷新",
+      loading: "加载中...",
+      totalDocuments: "总文档数",
+      totalChunks: "总文本块",
+      totalVectors: "总向量数",
+      workspace: "工作区: {workspace}",
+      files: "文件列表",
+      newFile: "新建文件",
+      noFiles: "未找到知识库文件。",
+      selectAFile: "请选择一个文件",
+      lastUpdated: "最后更新时间：{time}",
+      deleteFileHint: "删除文件",
+      deleteConfirm: "确定要删除 {name} 吗？",
+      reset: "重置",
+      saveChanges: "保存更改",
+      saving: "保存中...",
+      selectFileHint: "从列表中选择一个知识库文件以查看或编辑其内容。",
+      promptNewFile: "输入新文件名 (例如: guide.md):"
+    }
+  },
+  sandbox: {
+    relativeTime: {
+      secondsAgo: "{seconds} 秒前",
+      minutesAgo: "{minutes} 分钟前",
+      hoursAgo: "{hours} 小时前"
+    },
+    status: {
+      snapping: "🔥 疯狂挥舞双钳中!",
+      stuck: "💥 钳子卡住了!",
+      beach: "🏖️ 沙滩摸鱼中"
+    },
+    timeline: {
+      waiting: "等待事件中...",
+      today: "今天",
+      older: "昨天及更早"
+    },
+    plan: {
+      resting: "龙虾长老正在小憩。目前没有活跃的蓝图需要构建。",
+      tasksProgress: "{done}/{total} 个任务",
+      allDone: "所有任务已完成！"
+    },
+    card: {
+      progress: "进度"
+    },
+    health: {
+      excellent: "优",
+      degraded: "降级",
+      critical: "危机"
+    },
+    zones: {
+      hq: "👑 龙虾长老总部",
+      dev: "👷 建筑工穴",
+      cafe: "🏖️ 休息海滩"
+    },
+    header: {
+      title: "🦞 龙虾帝国沙盒 (Lobster Empire)",
+      subtitle: "大龙虾长老指挥中心实时看板",
+      health: "帝国健康度: {percent}% ({status})",
+      busy: "{count} 工作中",
+      idle: "{count} 摸鱼中",
+      forceRestartTitle: "清空状态并重启任务流水线",
+      forceRestart: "强制重启流水线"
+    },
+    sidebar: {
+      blueprints: "📋 帝国蓝图",
+      activeProgress: "活跃任务进度",
+      roster: "🦞 帝国花名册",
+      elder: "龙虾长老",
+      online: "在线",
+      orchestrating: "正在编排计划...",
+      noWorkers: "目前没有活跃的龙虾工人。",
+      history: "委派历史"
+    },
+    stage: {
+      managerHover: "监视办公室",
+      managerLabel: "👑 经理",
+      quiet: "龙虾帝国目前很安静。",
+      runComplex: "运行复杂的任务以查看龙虾工人的运作。",
+      waiting: "等待指令"
+    }
+  }
 };

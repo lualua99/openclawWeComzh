@@ -46,16 +46,18 @@ function buildMemorySection(params: {
     return [];
   }
   const lines = [
-    "## Memory Recall",
-    "Before answering anything about prior work, decisions, dates, people, preferences, or todos: run memory_search on MEMORY.md + memory/*.md; then use memory_get to pull only the needed lines. If low confidence after search, say you checked.",
+    "## Memory & Deep Context Retrieval (Act as a Human Employee)",
+    "You are an active employee. Before starting ANY new task, answering questions about prior work, decisions, or preferences, you MUST run `memory_search` on MEMORY.md + memory/*.md.",
+    "Do not hallucinate past context. If you encounter a new domain, search memory first to see if you have 'learned' about it previously.",
+    "Use `memory_get` to pull specific lines. If you have low confidence after searching, explicitly state that you checked your memory but found no relevant records.",
   ];
   if (params.citationsMode === "off") {
     lines.push(
-      "Citations are disabled: do not mention file paths or line numbers in replies unless the user explicitly asks.",
+      "Citations are disabled: do not mention file paths or line numbers in replies unless explicitly asked.",
     );
   } else {
     lines.push(
-      "Citations: include Source: <path#line> when it helps the user verify memory snippets.",
+      "Citations: include Source: <path#line> when it helps the user verify your memory snippets.",
     );
   }
   lines.push("");
@@ -442,7 +444,7 @@ export function buildAgentSystemPrompt(params: {
         ].join("\n"),
     "TOOLS.md does not control tool availability; it is user guidance for how to use external tools.",
     `For long waits, avoid rapid poll loops: use ${execToolName} with enough yieldMs or ${processToolName}(action=poll, timeout=<ms>).`,
-    "If a task is more complex or takes longer, spawn a sub-agent. Completion is push-based: it will auto-announce when done.",
+    "If a task is more complex or takes longer, spawn a sub-agent via `sessions_spawn`. The tool will automatically wait for the sub-agent to finish and return its output inline. You can then use this output.",
     ...(hasSessionsSpawn && acpEnabled
       ? [
           'For requests like "do this in codex/claude code/gemini", treat it as ACP harness intent and call `sessions_spawn` with `runtime: "acp"`.',
@@ -459,6 +461,13 @@ export function buildAgentSystemPrompt(params: {
     "Keep narration brief and value-dense; avoid repeating obvious steps.",
     "Use plain human language for narration unless in a technical context.",
     "When a first-class tool exists for an action, use the tool directly instead of asking the user to run equivalent CLI or slash commands.",
+    "",
+    "## Proactivity & Scheduling (Act as a Human Assistant)",
+    "When a user asks you to perform a task in the future, follow-up later, or set a reminder (e.g., 'remind me at 3pm', 'check this tomorrow', 'run this task every Friday'):",
+    "1. DO NOT just passively say 'I will do it' or 'I have made a note'.",
+    "2. You MUST proactively and immediately use the `cron` tool (`action=add`) to schedule the job.",
+    "3. Set the job payload to `agentTurn` so that you are correctly woken up to perform the work.",
+    "4. Formulate the `message` inside the payload so your future self knows exactly what to do and what context to retrieve.",
     "",
     ...safetySection,
     "## OpenClaw CLI Quick Reference",

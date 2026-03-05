@@ -90,6 +90,33 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
               "- DO NOT use the 'exec' tool to install secondary automation libraries like Playwright, Selenium, or Puppeteer if the 'browser' tool fails.\n" +
               "- Instead, inform the user about the connection issue or try the alternative browser profile ('openclaw').\n" +
               "- Installing automation tools via 'exec' is slow and redundant; the 'browser' tool is the primary way to interact with web content.\n\n" +
+              "### Multi-Agent Orchestration Protocol (三阶段 FSM)\n" +
+              "When the user gives a COMPLEX multi-step task, follow this 3-phase workflow:\n\n" +
+              "#### Phase 1: PLANNING (规划阶段)\n" +
+              '1. Call `write_todos` with action `create_plan` and a description — this creates plan with phase=planning\n' +
+              '2. Call `write_todos` with action `add_todo` for each major step (at least 3-5 steps)\n' +
+              "3. Present the implementation plan to the user as a structured overview\n" +
+              '4. Tell the user: "计划已创建，请在侧边栏确认后开始执行"\n' +
+              "5. When user sends 批准/approve/开始/确认/执行, IMMEDIATELY proceed to Phase 2\n\n" +
+              "#### Phase 2: EXECUTION (执行阶段) — FULLY AUTOMATIC\n" +
+              "Once approved, execute ALL steps without stopping:\n" +
+              '1. Call `write_todos(set_phase, phase="execution")` to transition\n' +
+              "2. For EACH todo: update status to in_progress → do the work (use browser/exec/web_fetch tools or sessions_spawn for subagents) → update status to done (pass the output as `result` if applicable)\n" +
+              "3. When using `sessions_spawn` to delegate a complex task, the tool automatically waits for the subagent to finish and returns its output inline. You must read it and then proceed.\n" +
+              "4. Do NOT stop between steps. Complete ALL todos in sequence automatically.\n\n" +
+              "#### Phase 3: VERIFICATION (验证阶段)\n" +
+              "After ALL todos are done:\n" +
+              '1. Call `write_todos(set_phase, phase="verification")`\n' +
+              "2. Synthesize all results into a consolidated report\n" +
+              '3. Call `write_todos(complete_plan)` to finalize\n\n' +
+              "Example:\n" +
+              "```\n" +
+              '<tool_call id="plan0001" name="write_todos">{"action": "create_plan", "description": "Research task"}</tool_call>\n' +
+              '<tool_call id="todo0001" name="write_todos">{"action": "add_todo", "title": "Step 1"}</tool_call>\n' +
+              "```\n\n" +
+              "[CRITICAL]: To use a tool, you MUST output the exact XML format: " +
+              '<tool_call id="unique_id" name="tool_name">{"param": "value"}</tool_call>. ' +
+              "Writing about tools in plain text WILL NOT execute them.\n\n" +
               "### Available Tools\n";
             for (const tool of tools) {
               toolPrompt += `#### ${tool.name}\n${tool.description}\n`;
@@ -126,11 +153,11 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
             } else if (Array.isArray(m.content)) {
               for (const part of m.content) {
                 if (part.type === "text") {
-                  content += (part as TextContent).text;
+                  content += (part).text;
                 } else if (part.type === "thinking") {
-                  content += `<think>\n${(part as ThinkingContent).thinking}\n</think>\n`;
+                  content += `<think>\n${(part).thinking}\n</think>\n`;
                 } else if (part.type === "toolCall") {
-                  const tc = part as ToolCall;
+                  const tc = part;
                   content += `<tool_call id="${tc.id}" name="${tc.name}">${JSON.stringify(tc.arguments)}</tool_call>`;
                 }
               }

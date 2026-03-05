@@ -164,6 +164,96 @@ export const AgentsFilesSetResultSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const AgentsMemoryListParamsSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemoryListResultSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+    workspace: NonEmptyString,
+    files: Type.Array(AgentsFileEntrySchema),
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemoryGetParamsSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+    name: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemoryGetResultSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+    workspace: NonEmptyString,
+    file: AgentsFileEntrySchema,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemorySetParamsSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+    name: NonEmptyString,
+    content: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemorySetResultSchema = Type.Object(
+  {
+    ok: Type.Literal(true),
+    agentId: NonEmptyString,
+    workspace: NonEmptyString,
+    file: AgentsFileEntrySchema,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemoryDeleteParamsSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+    name: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemoryDeleteResultSchema = Type.Object(
+  {
+    ok: Type.Literal(true),
+    agentId: NonEmptyString,
+    name: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemoryStatusParamsSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsMemoryStatusResultSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+    status: Type.Object(
+      {
+        totalChunks: Type.Integer({ minimum: 0 }),
+        totalVectors: Type.Integer({ minimum: 0 }),
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
+
 export const ModelsListParamsSchema = Type.Object({}, { additionalProperties: false });
 
 export const ModelsListResultSchema = Type.Object(

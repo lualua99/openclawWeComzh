@@ -82,4 +82,8 @@ export type AgentCommandOpts = {
   inputProvenance?: InputProvenance;
   /** Per-call stream param overrides (best-effort). */
   streamParams?: AgentStreamParams;
+  /** Explicit list of tools to grant to the agent. */
+  toolsOverride?: string[];
+  /** Explicit list of skills to grant to the agent. */
+  skillsOverride?: string[];
 };

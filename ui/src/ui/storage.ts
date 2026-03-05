@@ -1,4 +1,4 @@
-const KEY = "openclaw.control.settings.v1";
+const KEY = "openclaw.control.settings.v2";
 
 import { isSupportedLocale } from "../i18n/index.ts";
 import { inferBasePathFromPathname, normalizeBasePath } from "./navigation.ts";

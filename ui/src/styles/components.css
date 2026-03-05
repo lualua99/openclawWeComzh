@@ -432,14 +432,16 @@
 }
 
 .btn--icon.active {
-  background: var(--accent);
-  color: var(--primary-foreground);
-  box-shadow: 0 0 15px var(--accent-glow);
+  background: var(--accent-subtle);
+  color: var(--accent);
   border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px var(--accent-subtle),
+    0 0 12px var(--accent-glow);
 }
 
 .btn--icon.active svg {
-  stroke: var(--primary-foreground);
+  stroke: var(--accent);
 }
 
 .btn.danger {
@@ -847,11 +849,11 @@
   position: relative;
 }
 
-.cron-filter-dropdown__details > summary {
+.cron-filter-dropdown__details>summary {
   list-style: none;
 }
 
-.cron-filter-dropdown__details > summary::-webkit-details-marker {
+.cron-filter-dropdown__details>summary::-webkit-details-marker {
   display: none;
 }
 

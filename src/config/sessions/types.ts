@@ -164,6 +164,7 @@ export type SessionEntry = {
   skillsSnapshot?: SessionSkillSnapshot;
   systemPromptReport?: SessionSystemPromptReport;
   acp?: SessionAcpMeta;
+  needsHelp?: boolean;
 };
 
 function normalizeRuntimeField(value: string | undefined): string | undefined {

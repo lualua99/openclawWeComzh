@@ -36,6 +36,26 @@ import {
   AgentsFilesSetParamsSchema,
   type AgentsFilesSetResult,
   AgentsFilesSetResultSchema,
+  type AgentsMemoryListParams,
+  AgentsMemoryListParamsSchema,
+  type AgentsMemoryListResult,
+  AgentsMemoryListResultSchema,
+  type AgentsMemoryGetParams,
+  AgentsMemoryGetParamsSchema,
+  type AgentsMemoryGetResult,
+  AgentsMemoryGetResultSchema,
+  type AgentsMemorySetParams,
+  AgentsMemorySetParamsSchema,
+  type AgentsMemorySetResult,
+  AgentsMemorySetResultSchema,
+  type AgentsMemoryDeleteParams,
+  AgentsMemoryDeleteParamsSchema,
+  type AgentsMemoryDeleteResult,
+  AgentsMemoryDeleteResultSchema,
+  type AgentsMemoryStatusParams,
+  AgentsMemoryStatusParamsSchema,
+  type AgentsMemoryStatusResult,
+  AgentsMemoryStatusResultSchema,
   type AgentsListParams,
   AgentsListParamsSchema,
   type AgentsListResult,
@@ -262,6 +282,21 @@ export const validateAgentsFilesGetParams = ajv.compile<AgentsFilesGetParams>(
 export const validateAgentsFilesSetParams = ajv.compile<AgentsFilesSetParams>(
   AgentsFilesSetParamsSchema,
 );
+export const validateAgentsMemoryListParams = ajv.compile<AgentsMemoryListParams>(
+  AgentsMemoryListParamsSchema,
+);
+export const validateAgentsMemoryGetParams = ajv.compile<AgentsMemoryGetParams>(
+  AgentsMemoryGetParamsSchema,
+);
+export const validateAgentsMemorySetParams = ajv.compile<AgentsMemorySetParams>(
+  AgentsMemorySetParamsSchema,
+);
+export const validateAgentsMemoryDeleteParams = ajv.compile<AgentsMemoryDeleteParams>(
+  AgentsMemoryDeleteParamsSchema,
+);
+export const validateAgentsMemoryStatusParams = ajv.compile<AgentsMemoryStatusParams>(
+  AgentsMemoryStatusParamsSchema,
+);
 export const validateNodePairRequestParams = ajv.compile<NodePairRequestParams>(
   NodePairRequestParamsSchema,
 );
@@ -487,6 +522,16 @@ export {
   AgentsFilesGetResultSchema,
   AgentsFilesSetParamsSchema,
   AgentsFilesSetResultSchema,
+  AgentsMemoryListParamsSchema,
+  AgentsMemoryListResultSchema,
+  AgentsMemoryGetParamsSchema,
+  AgentsMemoryGetResultSchema,
+  AgentsMemorySetParamsSchema,
+  AgentsMemorySetResultSchema,
+  AgentsMemoryDeleteParamsSchema,
+  AgentsMemoryDeleteResultSchema,
+  AgentsMemoryStatusParamsSchema,
+  AgentsMemoryStatusResultSchema,
   AgentsListParamsSchema,
   AgentsListResultSchema,
   ModelsListParamsSchema,

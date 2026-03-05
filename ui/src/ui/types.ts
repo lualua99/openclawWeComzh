@@ -409,6 +409,33 @@ export type AgentsFilesSetResult = {
   file: AgentFileEntry;
 };
 
+export type AgentsMemoryListResult = {
+  agentId: string;
+  workspace: string;
+  files: AgentFileEntry[];
+};
+
+export type AgentsMemoryGetResult = {
+  agentId: string;
+  workspace: string;
+  file: AgentFileEntry;
+};
+
+export type AgentsMemorySetResult = {
+  ok: true;
+  agentId: string;
+  workspace: string;
+  file: AgentFileEntry;
+};
+
+export type AgentsMemoryStatusResult = {
+  agentId: string;
+  status: {
+    totalChunks: number;
+    totalVectors: number;
+  };
+};
+
 export type GatewaySessionRow = {
   key: string;
   kind: "direct" | "group" | "global" | "unknown";

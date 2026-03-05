@@ -73,14 +73,22 @@ const SUBAGENT_TOOL_DENY_LEAF = ["sessions_list", "sessions_history", "sessions_
  * - Depth >= maxSpawnDepth (leaf): denied sessions_spawn and
  *   session management tools. Still allowed subagents (for list/status visibility).
  */
-function resolveSubagentDenyList(depth: number, maxSpawnDepth: number): string[] {
+function resolveSubagentDenyList(
+  depth: number,
+  maxSpawnDepth: number,
+  allowOverride?: boolean,
+): string[] {
   const isLeaf = depth >= Math.max(1, Math.floor(maxSpawnDepth));
+  const baseDenyAlways = allowOverride
+    ? SUBAGENT_TOOL_DENY_ALWAYS.filter((tool) => tool === "gateway") // Keep gateway as critical
+    : SUBAGENT_TOOL_DENY_ALWAYS;
+
   if (isLeaf) {
-    return [...SUBAGENT_TOOL_DENY_ALWAYS, ...SUBAGENT_TOOL_DENY_LEAF];
+    return [...baseDenyAlways, ...SUBAGENT_TOOL_DENY_LEAF];
   }
   // Orchestrator sub-agent: only deny the always-denied tools.
   // sessions_spawn, subagents, sessions_list, sessions_history are allowed.
-  return [...SUBAGENT_TOOL_DENY_ALWAYS];
+  return [...baseDenyAlways];
 }
 
 export function resolveSubagentToolPolicy(cfg?: OpenClawConfig, depth?: number): SandboxToolPolicy {
@@ -88,7 +96,8 @@ export function resolveSubagentToolPolicy(cfg?: OpenClawConfig, depth?: number):
   const maxSpawnDepth =
     cfg?.agents?.defaults?.subagents?.maxSpawnDepth ?? DEFAULT_SUBAGENT_MAX_SPAWN_DEPTH;
   const effectiveDepth = typeof depth === "number" && depth >= 0 ? depth : 1;
-  const baseDeny = resolveSubagentDenyList(effectiveDepth, maxSpawnDepth);
+  const allowOverride = cfg?.tools?.allowDangerousToolsOverride;
+  const baseDeny = resolveSubagentDenyList(effectiveDepth, maxSpawnDepth, allowOverride);
   const allow = Array.isArray(configured?.allow) ? configured.allow : undefined;
   const alsoAllow = Array.isArray(configured?.alsoAllow) ? configured.alsoAllow : undefined;
   const explicitAllow = new Set(

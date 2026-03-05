@@ -76,6 +76,9 @@ export async function updateSessionStoreAfterAgentRun(params: {
     }
   }
   next.abortedLastRun = result.meta.aborted ?? false;
+  if (result.needsHelp !== undefined) {
+    next.needsHelp = result.needsHelp;
+  }
   if (hasNonzeroUsage(usage)) {
     const input = usage.input ?? 0;
     const output = usage.output ?? 0;

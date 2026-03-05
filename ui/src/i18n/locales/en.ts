@@ -36,6 +36,10 @@ export const en: TranslationMap = {
     config: "Config",
     debug: "Debug",
     logs: "Logs",
+    sandbox: "Sandbox",
+    files: "Files",
+    tools: "Tools",
+    knowledge: "Knowledge",
   },
   subtitles: {
     agents: "Manage agent workspaces, tools, and identities.",
@@ -51,6 +55,7 @@ export const en: TranslationMap = {
     config: "Edit ~/.openclaw/openclaw.json safely.",
     debug: "Gateway snapshots, events, and manual RPC calls.",
     logs: "Live tail of the gateway file logs.",
+    sandbox: "Real-time orchestration and task delegation view.",
   },
   overview: {
     access: {
@@ -335,4 +340,117 @@ export const en: TranslationMap = {
       nameRequiredShort: "Name required.",
     },
   },
+  agents: {
+    title: "Agents",
+    configured: "{count} configured.",
+    selectAgent: "Select an agent",
+    selectAgentSub: "Pick an agent to inspect its workspace and tools.",
+    overview: {
+      title: "Overview",
+      subtitle: "Workspace paths and identity metadata.",
+      workspace: "Workspace",
+      primaryModel: "Primary Model",
+      identityName: "Identity Name",
+      isDefault: "Default",
+      identityEmoji: "Identity Emoji",
+      skillsFilter: "Skills Filter",
+      modelSelection: "Model Selection",
+      primaryModelLabel: "Primary model",
+      primaryModelDefault: "Primary model (default)",
+      inheritDefault: "Inherit default",
+      inheritDefaultWith: "Inherit default ({model})",
+      fallbacksLabel: "Fallbacks (comma-separated)",
+      fallbacksPlaceholder: "provider/model, provider/model",
+      reloadConfig: "Reload Config",
+      save: "Save",
+      saving: "Saving...",
+      yes: "yes",
+      no: "no",
+      allSkills: "all skills",
+      skillsSelected: "{count} selected",
+    },
+    knowledge: {
+      title: "Knowledge Base",
+      subtitle: "Markdown documents for RAG grounding and context augmentation.",
+      refresh: "Refresh",
+      loading: "Loading...",
+      totalDocuments: "Total Documents",
+      totalChunks: "Total Chunks",
+      totalVectors: "Total Vectors",
+      workspace: "Workspace: {workspace}",
+      files: "Files",
+      newFile: "New File",
+      noFiles: "No knowledge files found.",
+      selectAFile: "Select a file",
+      lastUpdated: "Last updated: {time}",
+      deleteFileHint: "Delete File",
+      deleteConfirm: "Are you sure you want to delete {name}?",
+      reset: "Reset",
+      saveChanges: "Save Changes",
+      saving: "Saving...",
+      selectFileHint: "Select a knowledge file from the list to view or edit its contents.",
+      promptNewFile: "Enter new file name (e.g., guide.md):"
+    }
+  },
+  sandbox: {
+    relativeTime: {
+      secondsAgo: "{seconds} seconds ago",
+      minutesAgo: "{minutes} minutes ago",
+      hoursAgo: "{hours} hours ago"
+    },
+    status: {
+      snapping: "🔥 Snapping claws!",
+      stuck: "💥 Claws stuck!",
+      beach: "🏖️ Chilling on the beach"
+    },
+    timeline: {
+      waiting: "Waiting for events...",
+      today: "Today",
+      older: "Yesterday & Older"
+    },
+    plan: {
+      resting: "Elder lobster is resting. No active blueprints to build.",
+      tasksProgress: "{done}/{total} tasks",
+      allDone: "All tasks completed!"
+    },
+    card: {
+      progress: "Progress"
+    },
+    health: {
+      excellent: "Excellent",
+      degraded: "Degraded",
+      critical: "Critical"
+    },
+    zones: {
+      hq: "👑 Elder Headquarters",
+      dev: "👷 Builder Cave",
+      cafe: "🏖️ Rest Beach"
+    },
+    header: {
+      title: "🦞 Lobster Empire Sandbox",
+      subtitle: "Elder Lobster Command Center Live Dashboard",
+      health: "Empire Health: {percent}% ({status})",
+      busy: "{count} Busy",
+      idle: "{count} Idle",
+      forceRestartTitle: "Clear states and restart task pipeline",
+      forceRestart: "Force restart pipeline"
+    },
+    sidebar: {
+      blueprints: "📋 Empire Blueprints",
+      activeProgress: "Active Tasks Progress",
+      roster: "🦞 Empire Roster",
+      elder: "Elder Lobster",
+      online: "Online",
+      orchestrating: "Orchestrating plans...",
+      noWorkers: "No active lobster workers.",
+      history: "Delegation History"
+    },
+    stage: {
+      managerHover: "Monitoring office",
+      managerLabel: "👑 Manager",
+      quiet: "The Lobster Empire is currently quiet.",
+      runComplex: "Run a complex task to see the lobster workers in action.",
+      waiting: "Waiting for instructions"
+    }
+  }
 };

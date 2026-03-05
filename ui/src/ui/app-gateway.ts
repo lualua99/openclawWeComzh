@@ -3,6 +3,7 @@ import {
   type GatewayUpdateAvailableEventPayload,
 } from "../../../src/gateway/events.js";
 import { CHAT_SESSIONS_ACTIVE_MINUTES, flushChatQueueForEvent } from "./app-chat.ts";
+import { loadSandboxTaskPlan } from "./controllers/sandbox.ts";
 import type { EventLogEntry } from "./app-events.ts";
 import {
   applySettings,
@@ -72,6 +73,7 @@ type GatewayHost = {
   sessionKey: string;
   chatRunId: string | null;
   refreshSessionsAfterChat: Set<string>;
+  sandboxChatEvents: Record<string, unknown>;
   execApprovalQueue: ExecApprovalRequest[];
   execApprovalError: string | null;
   updateAvailable: UpdateAvailable | null;
@@ -255,6 +257,10 @@ function handleChatGatewayEvent(host: GatewayHost, payload: ChatEventPayload | u
   if (state === "final" && shouldReloadHistoryForFinalEvent(payload)) {
     void loadChatHistory(host as unknown as OpenClawApp);
   }
+  // Auto-refresh task plan when chat events complete (captures write_todos and subagent completions)
+  if (state === "final" || state === "aborted") {
+    void loadSandboxTaskPlan(host as unknown as OpenClawApp);
+  }
 }
 
 function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
@@ -278,7 +284,14 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   }
 
   if (evt.event === "chat") {
-    handleChatGatewayEvent(host, evt.payload as ChatEventPayload | undefined);
+    const payload = evt.payload as ChatEventPayload | undefined;
+    if (payload?.sessionKey && payload.message) {
+      host.sandboxChatEvents = {
+        ...host.sandboxChatEvents,
+        [payload.sessionKey]: payload.message,
+      };
+    }
+    handleChatGatewayEvent(host, payload);
     return;
   }
 
@@ -325,7 +338,18 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     const payload = evt.payload as GatewayUpdateAvailableEventPayload | undefined;
     host.updateAvailable = payload?.updateAvailable ?? null;
   }
+
+  // Auto-refresh task plan when agent tool calls stream in (debounced to avoid flooding)
+  if (evt.event === "agent") {
+    const now = Date.now();
+    if (!agentPlanRefreshLast || now - agentPlanRefreshLast > 3000) {
+      agentPlanRefreshLast = now;
+      void loadSandboxTaskPlan(host as unknown as OpenClawApp);
+    }
+  }
 }
+
+let agentPlanRefreshLast = 0;
 
 export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
   const snapshot = hello.snapshot as

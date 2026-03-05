@@ -16,7 +16,12 @@ import { resolveSubagentSpawnModelSelection } from "./model-selection.js";
 import { resolveSandboxRuntimeStatus } from "./sandbox/runtime-status.js";
 import { buildSubagentSystemPrompt } from "./subagent-announce.js";
 import { getSubagentDepthFromSessionStore } from "./subagent-depth.js";
-import { countActiveRunsForSession, registerSubagentRun } from "./subagent-registry.js";
+import {
+  countActiveRunsForSession,
+  registerSubagentRun,
+  waitForSubagentCompletion,
+} from "./subagent-registry.js";
+import { readLatestSubagentOutput } from "./subagent-announce.js";
 import { readStringParam } from "./tools/common.js";
 import {
   resolveDisplaySessionKey,
@@ -41,6 +46,8 @@ export type SpawnSubagentParams = {
   cleanup?: "delete" | "keep";
   sandbox?: SpawnSubagentSandboxMode;
   expectsCompletionMessage?: boolean;
+  tools?: string[];
+  skills?: string[];
 };
 
 export type SpawnSubagentContext = {
@@ -67,6 +74,7 @@ export type SpawnSubagentResult = {
   mode?: SpawnSubagentMode;
   note?: string;
   modelApplied?: boolean;
+  completionText?: string;
   error?: string;
 };
 
@@ -453,6 +461,8 @@ export async function spawnSubagentDirect(
         groupId: ctx.agentGroupId ?? undefined,
         groupChannel: ctx.agentGroupChannel ?? undefined,
         groupSpace: ctx.agentGroupSpace ?? undefined,
+        tools: params.tools,
+        skills: params.skills,
       },
       timeoutMs: 10_000,
     });
@@ -566,6 +576,29 @@ export async function spawnSubagentDirect(
         ? undefined
         : SUBAGENT_SPAWN_ACCEPTED_NOTE;
 
+  // Wait for completion if requested, so we can return the result inline
+  let completionText: string | undefined;
+  if (expectsCompletionMessage) {
+    if (!isCronSession) {
+      // Use config wait timeout
+      const waitTimeoutMs = typeof params.runTimeoutSeconds === "number" && params.runTimeoutSeconds > 0
+        ? params.runTimeoutSeconds * 1000 + 10_000
+        : 300_000; // default 5m wait for inline result
+
+      await waitForSubagentCompletion(childRunId, waitTimeoutMs);
+      
+      // Attempt to read the final message from the session
+      try {
+        const text = await readLatestSubagentOutput(childSessionKey);
+        if (text) {
+          completionText = text;
+        }
+      } catch {
+        // Ignore read errors
+      }
+    }
+  }
+
   return {
     status: "accepted",
     childSessionKey,
@@ -573,5 +606,6 @@ export async function spawnSubagentDirect(
     mode: spawnMode,
     note,
     modelApplied: resolvedModel ? modelApplied : undefined,
+    completionText,
   };
 }

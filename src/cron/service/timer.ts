@@ -224,9 +224,17 @@ function emitFailureAlert(
 ) {
   const safeJobName = params.job.name || params.job.id;
   const truncatedError = (params.error?.trim() || "unknown error").slice(0, 200);
+  
+  // Create a proactive, human-like instruction for the agent to analyze the failure
   const text = [
-    `Cron job "${safeJobName}" failed ${params.consecutiveErrors} times`,
-    `Last error: ${truncatedError}`,
+    `[CRITICAL SYSTEM ALERT] Your scheduled task "${safeJobName}" has failed ${params.consecutiveErrors} consecutive times.`,
+    `The latest error reported by the execution engine is:`,
+    `${truncatedError}`,
+    ``,
+    `As a proactive AI employee, you must immediately read this alert.`,
+    `1. Analyze the error above. Is it a transient issue, an authentication issue, or a logic error?`,
+    `2. Use your 'memory_search' tool to see if you have encountered this error or task before.`,
+    `3. Write a concise report back to me (the user) explaining why the task failed and what you suggest we do about it (e.g., stop the task, fix the inputs, or wait it out).`,
   ].join("\n");
 
   if (state.deps.sendCronFailureAlert) {

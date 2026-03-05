@@ -149,6 +149,53 @@ const coreEntries: CoreCliEntry[] = [
   {
     commands: [
       {
+        name: "start",
+        description: "Start the OpenClaw Gateway service",
+        hasSubcommands: false,
+      },
+    ],
+    register: async ({ program }) => {
+      const { runDaemonStart } = await import("../daemon-cli.js");
+      program
+        .command("start")
+        .description("Start the OpenClaw Gateway service")
+        .option("--json", "Output JSON", false)
+        .action(async (opts) => {
+          await runDaemonStart(opts);
+        });
+    },
+  },
+  {
+    commands: [
+      {
+        name: "run",
+        description: "Run the OpenClaw Gateway in the foreground",
+        hasSubcommands: false,
+      },
+    ],
+    register: async ({ program }) => {
+      const { addGatewayRunCommand } = await import("../gateway-cli/run.js");
+      addGatewayRunCommand(
+        program.command("run").description("Run the OpenClaw Gateway in the foreground"),
+      );
+    },
+  },
+  {
+    commands: [
+      {
+        name: "sandbox",
+        description: "Manage sandbox containers for agent isolation",
+        hasSubcommands: true,
+      },
+    ],
+    register: async ({ program }) => {
+      const mod = await import("../sandbox-cli.js");
+      mod.registerSandboxCli(program);
+    },
+  },
+  {
+    commands: [
+      {
         name: "agent",
         description: "Run one agent turn via the Gateway",
         hasSubcommands: false,

@@ -20,6 +20,16 @@ import type {
   AgentsFilesListResultSchema,
   AgentsFilesSetParamsSchema,
   AgentsFilesSetResultSchema,
+  AgentsMemoryListParamsSchema,
+  AgentsMemoryListResultSchema,
+  AgentsMemoryGetParamsSchema,
+  AgentsMemoryGetResultSchema,
+  AgentsMemorySetParamsSchema,
+  AgentsMemorySetResultSchema,
+  AgentsMemoryDeleteParamsSchema,
+  AgentsMemoryDeleteResultSchema,
+  AgentsMemoryStatusParamsSchema,
+  AgentsMemoryStatusResultSchema,
   AgentsListParamsSchema,
   AgentsListResultSchema,
   AgentsUpdateParamsSchema,
@@ -212,6 +222,16 @@ export type AgentsFilesGetParams = Static<typeof AgentsFilesGetParamsSchema>;
 export type AgentsFilesGetResult = Static<typeof AgentsFilesGetResultSchema>;
 export type AgentsFilesSetParams = Static<typeof AgentsFilesSetParamsSchema>;
 export type AgentsFilesSetResult = Static<typeof AgentsFilesSetResultSchema>;
+export type AgentsMemoryListParams = Static<typeof AgentsMemoryListParamsSchema>;
+export type AgentsMemoryListResult = Static<typeof AgentsMemoryListResultSchema>;
+export type AgentsMemoryGetParams = Static<typeof AgentsMemoryGetParamsSchema>;
+export type AgentsMemoryGetResult = Static<typeof AgentsMemoryGetResultSchema>;
+export type AgentsMemorySetParams = Static<typeof AgentsMemorySetParamsSchema>;
+export type AgentsMemorySetResult = Static<typeof AgentsMemorySetResultSchema>;
+export type AgentsMemoryDeleteParams = Static<typeof AgentsMemoryDeleteParamsSchema>;
+export type AgentsMemoryDeleteResult = Static<typeof AgentsMemoryDeleteResultSchema>;
+export type AgentsMemoryStatusParams = Static<typeof AgentsMemoryStatusParamsSchema>;
+export type AgentsMemoryStatusResult = Static<typeof AgentsMemoryStatusResultSchema>;
 export type AgentsListParams = Static<typeof AgentsListParamsSchema>;
 export type AgentsListResult = Static<typeof AgentsListResultSchema>;
 export type ModelChoice = Static<typeof ModelChoiceSchema>;

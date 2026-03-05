@@ -36,7 +36,8 @@ export function createQwenWebStreamFn(
 
         // Mode mapping logic (moved up to detect changes)
         const isThinkingModel = model.id.toLowerCase().includes("thinking");
-        let deepSearch = streamParams?.webSearchEnabled ?? isThinkingModel;
+        let deepSearch = streamParams?.webSearchEnabled ?? true;
+
 
         // Force new session if search mode changed to prevent sticky tools/behavior
         if (
@@ -68,21 +69,74 @@ export function createQwenWebStreamFn(
         if (tools.length > 0) {
           toolPrompt = "\n## Tool Use Instructions\n";
           toolPrompt +=
-            "You are equipped with specialized tools to perform actions or retrieve information. " +
-            'To use a tool, output a specific XML tag: <tool_call id="unique_id" name="tool_name">{"arg": "value"}</tool_call>. ' +
-            "Rules for tool use:\n" +
-            "1. ALWAYS think before calling a tool. Explain your reasoning inside <think> tags.\n" +
-            "2. The 'id' attribute should be a unique 8-character string for each call.\n" +
-            "3. Wait for the tool result before proceeding with further analysis.\n\n" +
-            "### Special Instructions for Browser Tool\n" +
-            "- **Profile 'openclaw' (Independent/Recommended)**: Opens a SEPARATE independent browser window. Use this for consistent, isolated sessions. Highly recommended for complex automation.\n" +
-            "- Profile 'chrome' (Shared): Uses your existing Chrome tabs (requires extension). Use this if you need to access personal logins or already open tabs.\n" +
-            "- **CONSISTENCY RULE**: Once you have started using a profile (or if you are switched to 'openclaw' due to connection errors), STAY with that profile for the remainder of the session. Do NOT switch back and forth as it will open redundant browser instances.\n\n" +
-            "### Automation Policy\n" +
-            "- DO NOT use the 'exec' tool to install secondary automation libraries like Playwright, Selenium, or Puppeteer if the 'browser' tool fails.\n" +
-            "- Instead, inform the user about the connection issue or try the alternative browser profile ('openclaw').\n" +
-            "- Installing automation tools via 'exec' is slow and redundant; the 'browser' tool is the primary way to interact with web content.\n\n" +
+            "You are equipped with specialized tools. " +
+            "**CRITICAL: You MUST use the XML tag format below to call tools. " +
+            "Writing about tools in natural language WILL NOT execute them.**\n\n" +
+            "### Required Format\n" +
+            "```\n" +
+            '<tool_call id="abcd1234" name="tool_name">{"param": "value"}</tool_call>\n' +
+            "```\n\n" +
+            "### Rules\n" +
+            "1. Think before calling (use <think> tags for reasoning).\n" +
+            "2. Each call needs a unique 8-char `id`.\n" +
+            "3. The content between tags MUST be valid JSON with the tool's parameters.\n" +
+            "4. You can make MULTIPLE tool calls in ONE response for parallel execution.\n" +
+            "5. **NEVER describe a tool call in text. ALWAYS use the XML format above.**\n\n" +
+            "### Example: Parallel Subagent Delegation\n" +
+            "To spawn 3 parallel subagents:\n" +
+            "```\n" +
+            '<tool_call id="sub00001" name="sessions_spawn">{"task": "Research NVIDIA GPU products and pricing", "label": "nvidia_research"}</tool_call>\n' +
+            '<tool_call id="sub00002" name="sessions_spawn">{"task": "Research AMD GPU products and pricing", "label": "amd_research"}</tool_call>\n' +
+            '<tool_call id="sub00003" name="sessions_spawn">{"task": "Research Apple GPU products and pricing", "label": "apple_research"}</tool_call>\n' +
+            "```\n\n" +
+            "### ⚠️ Anti-Pattern (DO NOT DO THIS)\n" +
+            "❌ Wrong: \"I will now execute sessions_spawn three times...\"\n" +
+            "✅ Correct: Output the actual <tool_call> XML tags as shown above.\n\n" +
+            "### Browser Tool\n" +
+            "- Profile 'openclaw' (Recommended): Independent browser window.\n" +
+            "- Profile 'chrome': Uses existing Chrome tabs (requires extension).\n" +
+            "- Once started with a profile, STAY with it.\n" +
+            "- Do NOT install Playwright/Selenium/Puppeteer via exec.\n\n" +
+            "### Multi-Agent Orchestration Protocol (三阶段 FSM)\n" +
+            "When the user gives a COMPLEX multi-step task, follow this 3-phase workflow:\n\n" +
+            "#### Phase 1: PLANNING (规划阶段)\n" +
+            "1. Call `write_todos(create_plan, description=\"...\")` — this creates plan with phase=planning\n" +
+            "2. Call `write_todos(add_todo, title=\"...\")` for each major step (at least 3-5 steps)\n" +
+            "3. Present the implementation plan to the user as a structured Markdown overview:\n" +
+            "   - Problem analysis / 问题分析\n" +
+            "   - Proposed approach / 实施方案\n" +
+            "   - Risk assessment / 风险评估\n" +
+            '4. Tell user: "计划已创建，请在侧边栏确认后开始执行"\n' +
+            "5. When user sends 批准/approve/开始/确认/执行, IMMEDIATELY proceed to Phase 2\n\n" +
+            "#### Phase 2: EXECUTION (执行阶段) — FULLY AUTOMATIC\n" +
+            "Once approved, execute ALL steps without stopping:\n" +
+            "1. Call `write_todos(set_phase, phase=\"execution\")` to transition\n" +
+            "2. For each todo:\n" +
+            "   - `write_todos(update_todo, taskId, status=\"in_progress\")`\n" +
+            "   - Do the work directly OR `sessions_spawn(task=\"...\", label=\"...\")` to delegate\n" +
+            "   - When using `sessions_spawn`, the tool automatically waits for the subagent to finish and returns its output inline. You must read it and then proceed.\n" +
+            "3. Complete ALL todos automatically: `write_todos(update_todo, taskId, status=\"done\", result=\"...\")` (pass subagent or step output in result)\n" +
+            "4. Do NOT stop or ask for approval between steps.\n\n" +
+            "#### Phase 3: VERIFICATION (验证阶段)\n" +
+            "After ALL todos are done:\n" +
+            "1. Call `write_todos(set_phase, phase=\"verification\")`\n" +
+            "2. Synthesize all subagent results into a consolidated report\n" +
+            "3. Call `write_todos(complete_plan)` to finalize (auto-sets phase=complete)\n\n" +
+            "Example PLANNING phase:\n" +
+            "```\n" +
+            '<tool_call id="plan0001" name="write_todos">{"action": "create_plan", "description": "GPU comparison research"}</tool_call>\n' +
+            '<tool_call id="todo0001" name="write_todos">{"action": "add_todo", "title": "Research NVIDIA GPUs"}</tool_call>\n' +
+            '<tool_call id="todo0002" name="write_todos">{"action": "add_todo", "title": "Research AMD GPUs"}</tool_call>\n' +
+            "```\n" +
+            "Then present plan to user and tell them to click approve in the sidebar.\n\n" +
+            "Example EXECUTION phase (after user approval):\n" +
+            "```\n" +
+            '<tool_call id="phase001" name="write_todos">{"action": "set_phase", "phase": "execution"}</tool_call>\n' +
+            '<tool_call id="upd00001" name="write_todos">{"action": "update_todo", "taskId": "<id>", "status": "in_progress"}</tool_call>\n' +
+            '<tool_call id="spn00001" name="sessions_spawn">{"task": "Research NVIDIA GPU lineup...", "label": "nvidia_research"}</tool_call>\n' +
+            "```\n\n" +
             "### Available Tools\n";
+
 
           // If native search is enabled, we hide the local web_search tool to force native logic
           const filteredTools = streamParams?.webSearchEnabled
@@ -171,8 +225,9 @@ export function createQwenWebStreamFn(
 
         if (toolPrompt && parentId) {
           prompt +=
-            '\n\n[SYSTEM HINT]: Keep in mind your available tools. To use a tool, you MUST output the EXACT XML format: <tool_call id="unique_id" name="tool_name">{"arg": "value"}</tool_call>. Using plain text to describe your action will FAIL to execute the tool.';
+            '\n\n[SYSTEM HINT]: CRITICAL REMINDER — To use a tool, you MUST output the exact XML format: <tool_call id="unique_id" name="tool_name">{"param": "value"}</tool_call>. Writing about tools in plain text WILL NOT execute them. For parallel tasks (e.g., spawning multiple subagents), output multiple <tool_call> tags in the same response.';
         }
+
 
         // Append Mode Hint to all prompts (even continuing ones) to ensure consistency
         const modeHint = deepSearch

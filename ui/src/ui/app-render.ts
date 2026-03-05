@@ -1,11 +1,19 @@
 import { html, nothing } from "lit";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
-import { t } from "../i18n/index.ts";
+import { t, i18n } from "../i18n/index.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
 import { renderUsageTab } from "./app-render-usage-tab.ts";
 import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers.ts";
+import "./components/language-switcher.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import { loadAgentFileContent, loadAgentFiles, saveAgentFile } from "./controllers/agent-files.ts";
+import {
+  deleteAgentKnowledgeFile,
+  loadAgentKnowledge,
+  loadAgentKnowledgeFileContent,
+  loadAgentKnowledgeStatus,
+  saveAgentKnowledgeFile,
+} from "./controllers/agent-knowledge.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
 import { loadAgents, loadToolsCatalog } from "./controllers/agents.ts";
@@ -55,6 +63,7 @@ import {
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
+import { loadSandboxTaskPlan } from "./controllers/sandbox.ts";
 import { deleteSessionAndRefresh, loadSessions, patchSession } from "./controllers/sessions.ts";
 import {
   installSkill,
@@ -79,6 +88,7 @@ import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
+import { renderSandbox } from "./views/sandbox.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
 
@@ -159,7 +169,7 @@ export function renderApp(state: AppViewState) {
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const configValue =
-    state.configForm ?? (state.configSnapshot?.config as Record<string, unknown> | null);
+    state.configForm ?? (state.configSnapshot?.config);
   const basePath = normalizeBasePath(state.basePath ?? "");
   const resolvedAgentId =
     state.agentsSelectedId ??
@@ -221,45 +231,25 @@ export function renderApp(state: AppViewState) {
 
   return html`
     <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button
-            class="nav-collapse-toggle"
-            @click=${() =>
-              state.applySettings({
-                ...state.settings,
-                navCollapsed: !state.settings.navCollapsed,
-              })}
-            title="${state.settings.navCollapsed ? t("nav.expand") : t("nav.collapse")}"
-            aria-label="${state.settings.navCollapsed ? t("nav.expand") : t("nav.collapse")}"
-          >
-            <span class="nav-collapse-toggle__icon">${icons.menu}</span>
-          </button>
+      <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
+
+        <div class="nav-brand-header">
           <div class="brand">
             <div class="brand-logo">
               <img src=${basePath ? `${basePath}/favicon.svg` : "/favicon.svg"} alt="OpenClaw" />
             </div>
-            <div class="brand-text">
-              <div class="brand-title">OPENCLAW</div>
-              <div class="brand-sub">Gateway Dashboard</div>
-            </div>
+            ${
+              !state.settings.navCollapsed
+                ? html`
+                    <div class="brand-text">
+                      <div class="brand-title">OPENCLAW</div>
+                      <div class="brand-sub">Gateway Dashboard</div>
+                    </div>
+                  `
+                : nothing
+            }
           </div>
         </div>
-        <div class="topbar-status">
-          <div class="pill">
-            <span class="statusDot ${versionStatusClass}"></span>
-            <span>${t("common.version")}</span>
-            <span class="mono">${openClawVersion}</span>
-          </div>
-          <div class="pill">
-            <span class="statusDot ${state.connected ? "ok" : ""}"></span>
-            <span>${t("common.health")}</span>
-            <span class="mono">${state.connected ? t("common.ok") : t("common.offline")}</span>
-          </div>
-          ${renderThemeToggle(state)}
-        </div>
-      </header>
-      <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
         ${TAB_GROUPS.map((group) => {
           const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
           const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
@@ -304,25 +294,65 @@ export function renderApp(state: AppViewState) {
           </div>
         </div>
       </aside>
-      <main class="content ${isChat ? "content--chat" : ""}">
-        ${
-          availableUpdate
-            ? html`<div class="update-banner callout danger" role="alert">
-              <strong>Update available:</strong> v${availableUpdate.latestVersion}
-              (running v${availableUpdate.currentVersion}).
-              <button
-                class="btn btn--sm update-banner__btn"
-                ?disabled=${state.updateRunning || !state.connected}
-                @click=${() => runUpdate(state)}
-              >${state.updateRunning ? "Updating…" : "Update now"}</button>
-            </div>`
-            : nothing
-        }
-        <section class="content-header">
-          <div>
-            ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}
-            ${state.tab === "usage" ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
+      <div class="page-container">
+        <header class="page-header">
+          <div class="header-left">
+            <button
+              type="button"
+              class="nav-collapse-toggle"
+              @click=${() =>
+                state.applySettings({
+                  ...state.settings,
+                  navCollapsed: !state.settings.navCollapsed,
+                })}
+              title="${state.settings.navCollapsed ? t("nav.expand") : t("nav.collapse")}"
+              aria-label="${state.settings.navCollapsed ? t("nav.expand") : t("nav.collapse")}"
+            >
+              <span class="nav-collapse-toggle__icon">${icons.menu}</span>
+            </button>
+            <span class="header-title">${state.tab === "usage" ? "" : titleForTab(state.tab)}</span>
           </div>
+          <div class="header-right">
+            <language-switcher 
+              .locale=${state.settings.locale || "en"}
+              @locale-change=${(e: CustomEvent) => {
+                const loc = e.detail.locale;
+                state.applySettings({ ...state.settings, locale: loc });
+                i18n.setLocale(loc);
+              }}
+            ></language-switcher>
+            <div class="pill">
+              <span class="statusDot ${versionStatusClass}"></span>
+              <span>${t("common.version")}</span>
+              <span class="mono">${openClawVersion}</span>
+            </div>
+            <div class="pill">
+              <span class="statusDot ${state.connected ? "ok" : ""}"></span>
+              <span>${t("common.health")}</span>
+              <span class="mono">${state.connected ? t("common.ok") : t("common.offline")}</span>
+            </div>
+            ${renderThemeToggle(state)}
+          </div>
+        </header>
+
+        <main class="content ${isChat ? "content--chat" : ""}">
+          ${
+            availableUpdate
+              ? html`<div class="update-banner callout danger" role="alert">
+                <strong>Update available:</strong> v${availableUpdate.latestVersion}
+                (running v${availableUpdate.currentVersion}).
+                <button
+                  class="btn btn--sm update-banner__btn"
+                  ?disabled=${state.updateRunning || !state.connected}
+                  @click=${() => runUpdate(state)}
+                >${state.updateRunning ? "Updating…" : "Update now"}</button>
+              </div>`
+              : nothing
+          }
+          <section class="content-header">
+            <div>
+              ${state.tab === "usage" ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
+            </div>
           <div class="page-meta">
             ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
             ${isChat ? renderChatControls(state) : nothing}
@@ -349,6 +379,10 @@ export function renderApp(state: AppViewState) {
                   state.sessionKey = next;
                   state.chatMessage = "";
                   state.resetToolStream();
+                  state.sandboxTaskPlan = null;
+                  state.sandboxTaskPlanLoading = false;
+                  state.sandboxTaskPlanError = null;
+                  state.sandboxChatEvents = {};
                   state.applySettings({
                     ...state.settings,
                     sessionKey: next,
@@ -433,6 +467,26 @@ export function renderApp(state: AppViewState) {
                 onRefresh: () => loadSessions(state),
                 onPatch: (key, patch) => patchSession(state, key, patch),
                 onDelete: (key) => deleteSessionAndRefresh(state, key),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "sandbox"
+            ? renderSandbox({
+                sessionKey: state.sessionKey,
+                loading: state.sessionsLoading,
+                result: state.sessionsResult,
+                error: state.sessionsError,
+                sandboxChatEvents: state.sandboxChatEvents,
+                taskPlan: state.sandboxTaskPlan ?? null,
+                onRefresh: async () => {
+                  await loadSessions(state);
+                  await loadSandboxTaskPlan(state);
+                },
+                onForceRestart: () => {
+                  state.handleSendChat("/new", { restoreDraft: true });
+                },
               })
             : nothing
         }
@@ -561,6 +615,14 @@ export function renderApp(state: AppViewState) {
                 agentFileContents: state.agentFileContents,
                 agentFileDrafts: state.agentFileDrafts,
                 agentFileSaving: state.agentFileSaving,
+                agentKnowledgeLoading: state.agentKnowledgeLoading,
+                agentKnowledgeError: state.agentKnowledgeError,
+                agentKnowledgeList: state.agentKnowledgeList,
+                agentKnowledgeStatus: state.agentKnowledgeStatus,
+                agentKnowledgeFileContents: state.agentKnowledgeFileContents,
+                agentKnowledgeFileDrafts: state.agentKnowledgeFileDrafts,
+                agentKnowledgeFileActive: state.agentKnowledgeFileActive,
+                agentKnowledgeSaving: state.agentKnowledgeSaving,
                 agentIdentityLoading: state.agentIdentityLoading,
                 agentIdentityError: state.agentIdentityError,
                 agentIdentityById: state.agentIdentityById,
@@ -596,6 +658,13 @@ export function renderApp(state: AppViewState) {
                   state.agentFileActive = null;
                   state.agentFileContents = {};
                   state.agentFileDrafts = {};
+                  state.agentKnowledgeList = null;
+                  state.agentKnowledgeStatus = null;
+                  state.agentKnowledgeError = null;
+                  state.agentKnowledgeLoading = false;
+                  state.agentKnowledgeFileActive = null;
+                  state.agentKnowledgeFileContents = {};
+                  state.agentKnowledgeFileDrafts = {};
                   state.agentSkillsReport = null;
                   state.agentSkillsError = null;
                   state.agentSkillsAgentId = null;
@@ -605,6 +674,10 @@ export function renderApp(state: AppViewState) {
                   }
                   if (state.agentsPanel === "files") {
                     void loadAgentFiles(state, agentId);
+                  }
+                  if (state.agentsPanel === "knowledge") {
+                    void loadAgentKnowledge(state, agentId);
+                    void loadAgentKnowledgeStatus(state, agentId);
                   }
                   if (state.agentsPanel === "skills") {
                     void loadAgentSkills(state, agentId);
@@ -620,6 +693,18 @@ export function renderApp(state: AppViewState) {
                       state.agentFileContents = {};
                       state.agentFileDrafts = {};
                       void loadAgentFiles(state, resolvedAgentId);
+                    }
+                  }
+                  if (panel === "knowledge" && resolvedAgentId) {
+                    if (state.agentKnowledgeList?.agentId !== resolvedAgentId) {
+                      state.agentKnowledgeList = null;
+                      state.agentKnowledgeStatus = null;
+                      state.agentKnowledgeError = null;
+                      state.agentKnowledgeFileActive = null;
+                      state.agentKnowledgeFileContents = {};
+                      state.agentKnowledgeFileDrafts = {};
+                      void loadAgentKnowledge(state, resolvedAgentId);
+                      void loadAgentKnowledgeStatus(state, resolvedAgentId);
                     }
                   }
                   if (panel === "tools") {
@@ -659,6 +744,38 @@ export function renderApp(state: AppViewState) {
                   const content =
                     state.agentFileDrafts[name] ?? state.agentFileContents[name] ?? "";
                   void saveAgentFile(state, resolvedAgentId, name, content);
+                },
+                onKnowledgeLoadFiles: (agentId) => {
+                  void loadAgentKnowledge(state, agentId);
+                  void loadAgentKnowledgeStatus(state, agentId);
+                },
+                onKnowledgeSelectFile: (name) => {
+                  state.agentKnowledgeFileActive = name;
+                  if (!resolvedAgentId) {
+                    return;
+                  }
+                  void loadAgentKnowledgeFileContent(state, resolvedAgentId, name);
+                },
+                onKnowledgeFileDraftChange: (name, content) => {
+                  state.agentKnowledgeFileDrafts = { ...state.agentKnowledgeFileDrafts, [name]: content };
+                },
+                onKnowledgeFileReset: (name) => {
+                  const base = state.agentKnowledgeFileContents[name] ?? "";
+                  state.agentKnowledgeFileDrafts = { ...state.agentKnowledgeFileDrafts, [name]: base };
+                },
+                onKnowledgeFileSave: (name) => {
+                  if (!resolvedAgentId) {
+                    return;
+                  }
+                  const content =
+                    state.agentKnowledgeFileDrafts[name] ?? state.agentKnowledgeFileContents[name] ?? "";
+                  void saveAgentKnowledgeFile(state, resolvedAgentId, name, content);
+                },
+                onKnowledgeFileDelete: (name) => {
+                  if (!resolvedAgentId) {
+                    return;
+                  }
+                  void deleteAgentKnowledgeFile(state, resolvedAgentId, name);
                 },
                 onToolsProfileChange: (agentId, profile, clearAllow) => {
                   if (!configValue) {
@@ -926,7 +1043,7 @@ export function renderApp(state: AppViewState) {
                 devicesList: state.devicesList,
                 configForm:
                   state.configForm ??
-                  (state.configSnapshot?.config as Record<string, unknown> | null),
+                  (state.configSnapshot?.config),
                 configLoading: state.configLoading,
                 configSaving: state.configSaving,
                 configDirty: state.configFormDirty,
@@ -1009,6 +1126,10 @@ export function renderApp(state: AppViewState) {
                   state.chatQueue = [];
                   state.resetToolStream();
                   state.resetChatScroll();
+                  state.sandboxTaskPlan = null;
+                  state.sandboxTaskPlanLoading = false;
+                  state.sandboxTaskPlanError = null;
+                  state.sandboxChatEvents = {};
                   state.applySettings({
                     ...state.settings,
                     sessionKey: next,
@@ -1038,6 +1159,7 @@ export function renderApp(state: AppViewState) {
                 error: state.lastError,
                 sessions: state.sessionsResult,
                 focusMode: chatFocus,
+                taskPlan: state.sandboxTaskPlan ?? null,
                 onRefresh: () => {
                   state.resetToolStream();
                   return Promise.all([loadChatHistory(state), refreshChatAvatar(state)]);
@@ -1074,6 +1196,14 @@ export function renderApp(state: AppViewState) {
                 assistantAvatar: state.assistantAvatar,
                 webSearchEnabled: state.chatWebSearchEnabled,
                 onToggleWebSearch: (enabled: boolean) => state.handleToggleWebSearch(enabled),
+                onApprovePlan: () => {
+                  state.chatMessage = "已批准计划，请开始执行";
+                  state.handleSendChat();
+                },
+                sandboxChatEvents: state.sandboxChatEvents,
+                sandboxSessions: state.sessionsResult?.sessions?.filter(
+                  (r) => r.kind !== "global" && !r.systemSent,
+                ),
               })
             : nothing
         }
@@ -1162,6 +1292,7 @@ export function renderApp(state: AppViewState) {
             : nothing
         }
       </main>
+      </div>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
     </div>

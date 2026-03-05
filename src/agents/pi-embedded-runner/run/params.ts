@@ -69,6 +69,10 @@ export type RunEmbeddedPiAgentParams = {
   clientTools?: ClientToolDefinition[];
   /** Disable built-in tools for this run (LLM-only mode). */
   disableTools?: boolean;
+  /** Explicit list of tools to use, ignoring the default agent policy. */
+  toolsOverride?: string[];
+  /** Explicit list of skills to load, ignoring the default agent policy. */
+  skillsOverride?: string[];
   provider?: string;
   model?: string;
   authProfileId?: string;

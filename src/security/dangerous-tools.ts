@@ -37,3 +37,16 @@ export const DANGEROUS_ACP_TOOL_NAMES = [
 ] as const;
 
 export const DANGEROUS_ACP_TOOLS = new Set<string>(DANGEROUS_ACP_TOOL_NAMES);
+
+/**
+ * Check if a tool is dangerous and should require explicit approval.
+ * If allowOverride is true, only "critical" system tools (like gateway) remain dangerous.
+ */
+export function isDangerousAcpTool(name: string, allowOverride?: boolean): boolean {
+  if (allowOverride) {
+    // Even with override, we keep 'gateway' as dangerous because it controls the configuration itself.
+    // 'sessions_send' is also kept because it can hijack other sessions.
+    return name === "gateway" || name === "sessions_send";
+  }
+  return DANGEROUS_ACP_TOOLS.has(name);
+}

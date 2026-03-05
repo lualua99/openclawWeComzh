@@ -272,6 +272,8 @@ export type FsToolsConfig = {
 };
 
 export type AgentToolsConfig = {
+  /** Allow dangerous tools override. */
+  allowDangerousToolsOverride?: boolean;
   /** Base tool profile applied before allow/deny lists. */
   profile?: ToolProfileId;
   allow?: string[];
@@ -418,6 +420,8 @@ export type MemorySearchConfig = {
 };
 
 export type ToolsConfig = {
+  /** Allow dangerous tools override. */
+  allowDangerousToolsOverride?: boolean;
   /** Base tool profile applied before allow/deny lists. */
   profile?: ToolProfileId;
   allow?: string[];

@@ -37,8 +37,8 @@ export class ChatThinking extends LitElement {
     }
 
     .thinking-box {
-      border: 1px solid var(--border-subtle, rgba(224, 224, 224, 0.4));
-      background: var(--bg-surface-glass, rgba(249, 249, 249, 0.05));
+      border: 1px solid var(--border, rgba(224, 224, 224, 0.4));
+      background: var(--bg-accent, rgba(249, 249, 249, 0.05));
       backdrop-filter: blur(8px);
       border-radius: 12px;
       overflow: hidden;
@@ -55,7 +55,7 @@ export class ChatThinking extends LitElement {
       user-select: none;
       font-size: 0.85rem;
       font-weight: 500;
-      color: var(--text-muted, rgba(255, 255, 255, 0.6));
+      color: var(--muted, #8c8c8c);
       background: transparent;
     }
 
@@ -129,7 +129,7 @@ export class ChatThinking extends LitElement {
       padding: 0 14px 14px 14px;
       font-size: 0.9rem;
       line-height: 1.6;
-      color: var(--text-main, rgba(255, 255, 255, 0.85));
+      color: var(--text, #d9d9d9);
       border-top: 1px solid transparent;
       max-height: 0;
       opacity: 0;
@@ -158,7 +158,29 @@ export class ChatThinking extends LitElement {
       max-height: 3000px;
       opacity: 1;
       padding-top: 12px;
-      border-top-color: var(--border-subtle, rgba(255, 255, 255, 0.05));
+      border-top-color: var(--border, rgba(255, 255, 255, 0.05));
+    }
+
+    /* Skeleton loader for empty streaming state */
+    .skeleton-typing {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 20px;
+    }
+    .skeleton-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-thinking, #818cf8);
+      border-radius: 50%;
+      opacity: 0.4;
+      animation: thinkingTyping 1.4s infinite ease-in-out both;
+    }
+    .skeleton-dot:nth-child(1) { animation-delay: -0.32s; }
+    .skeleton-dot:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes thinkingTyping {
+      0%, 80%, 100% { transform: scale(0); opacity: 0.2; }
+      40% { transform: scale(1); opacity: 1; }
     }
 
     .thinking-content :first-child {
@@ -229,7 +251,19 @@ export class ChatThinking extends LitElement {
         </div>
         <div class="thinking-content ${this.isExpanded ? "expanded" : ""}">
           <div class="thinking-content-inner">
-            ${unsafeHTML(toSanitizedMarkdownHtml(this.content))}
+            ${
+              this.content.trim()
+                ? unsafeHTML(toSanitizedMarkdownHtml(this.content))
+                : this.isStreaming
+                  ? html`
+                      <div class="skeleton-typing">
+                        <div class="skeleton-dot"></div>
+                        <div class="skeleton-dot"></div>
+                        <div class="skeleton-dot"></div>
+                      </div>
+                    `
+                  : nothing
+            }
           </div>
         </div>
       </div>

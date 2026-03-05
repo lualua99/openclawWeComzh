@@ -380,6 +380,17 @@ export async function runCronIsolatedAgentTurn(params: {
     // Internal/trusted source - use original format
     commandBody = `${base}\n${timeLine}`.trim();
   }
+  
+  // Inject proactive AI employee role and memory instructions
+  const memoryPreamble = [
+    `[Scheduled Task Context]`,
+    `You are an AI employee executing a scheduled background task. Do not treat this as a simple one-off chat query.`,
+    `- Memory-First: If you need state/context to complete this task (e.g. "what was the last id I processed?"), use 'memory_search' or 'memory_get' to retrieve your notes.`,
+    `- Learning: If you discover new configurations, solve a problem, or reach a milestone, use 'write' to save those findings to the memory/ directory so your future scheduled runs can succeed.`,
+  ].join("\n");
+  
+  commandBody = `${memoryPreamble}\n\n${commandBody}`;
+  
   if (deliveryRequested) {
     commandBody =
       `${commandBody}\n\nReturn your summary as plain text; it will be delivered automatically. If the task explicitly calls for messaging a specific external recipient, note who/where it should go instead of sending it yourself.`.trim();

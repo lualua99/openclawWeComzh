@@ -210,11 +210,20 @@ export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
           }
           logError(`[tools] ${normalizedName} failed: ${described.message}`);
 
+          const isValidationError =
+            described.message.includes("Validation failed for tool") ||
+            described.message.includes("must have required property") ||
+            described.message.includes("must be") ||
+            described.message.includes("must match");
+
           const errorResult = jsonResult({
             status: "error",
             tool: normalizedName,
-            error: described.message,
+            error: isValidationError
+              ? `Tool parameter validation failed: ${described.message}\n\nThis means you called the tool with invalid or missing arguments. Please check the tool's required parameters and retry with correct arguments. Do NOT retry with the same empty or incomplete arguments.`
+              : described.message,
           });
+
 
           // Call after_tool_call hook for errors too
           const hookRunner = getGlobalHookRunner();

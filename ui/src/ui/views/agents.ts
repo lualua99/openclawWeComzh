@@ -1,8 +1,11 @@
 import { html, nothing } from "lit";
+import { t } from "../../i18n/index.ts";
 import type {
   AgentIdentityResult,
   AgentsFilesListResult,
   AgentsListResult,
+  AgentsMemoryListResult,
+  AgentsMemoryStatusResult,
   ChannelsStatusSnapshot,
   CronJob,
   CronStatus,
@@ -14,6 +17,7 @@ import {
   renderAgentChannels,
   renderAgentCron,
 } from "./agents-panels-status-files.ts";
+import { renderAgentKnowledge } from "./agents-panels-knowledge.ts";
 import { renderAgentTools, renderAgentSkills } from "./agents-panels-tools-skills.ts";
 import {
   agentBadgeText,
@@ -29,7 +33,7 @@ import {
   resolveModelPrimary,
 } from "./agents-utils.ts";
 
-export type AgentsPanel = "overview" | "files" | "tools" | "skills" | "channels" | "cron";
+export type AgentsPanel = "overview" | "files" | "tools" | "skills" | "channels" | "cron" | "knowledge";
 
 export type AgentsProps = {
   loading: boolean;
@@ -56,6 +60,14 @@ export type AgentsProps = {
   agentFileContents: Record<string, string>;
   agentFileDrafts: Record<string, string>;
   agentFileSaving: boolean;
+  agentKnowledgeLoading: boolean;
+  agentKnowledgeError: string | null;
+  agentKnowledgeList: AgentsMemoryListResult | null;
+  agentKnowledgeStatus: AgentsMemoryStatusResult | null;
+  agentKnowledgeFileActive: string | null;
+  agentKnowledgeFileContents: Record<string, string>;
+  agentKnowledgeFileDrafts: Record<string, string>;
+  agentKnowledgeSaving: boolean;
   agentIdentityLoading: boolean;
   agentIdentityError: string | null;
   agentIdentityById: Record<string, AgentIdentityResult>;
@@ -75,6 +87,12 @@ export type AgentsProps = {
   onFileDraftChange: (name: string, content: string) => void;
   onFileReset: (name: string) => void;
   onFileSave: (name: string) => void;
+  onKnowledgeLoadFiles: (agentId: string) => void;
+  onKnowledgeSelectFile: (name: string) => void;
+  onKnowledgeFileDraftChange: (name: string, content: string) => void;
+  onKnowledgeFileReset: (name: string) => void;
+  onKnowledgeFileSave: (name: string) => void;
+  onKnowledgeFileDelete: (name: string) => void;
   onToolsProfileChange: (agentId: string, profile: string | null, clearAllow: boolean) => void;
   onToolsOverridesChange: (agentId: string, alsoAllow: string[], deny: string[]) => void;
   onConfigReload: () => void;
@@ -112,11 +130,11 @@ export function renderAgents(props: AgentsProps) {
       <section class="card agents-sidebar">
         <div class="row" style="justify-content: space-between;">
           <div>
-            <div class="card-title">Agents</div>
-            <div class="card-sub">${agents.length} configured.</div>
+            <div class="card-title">${t("agents.title")}</div>
+            <div class="card-sub">${t("agents.configured", { count: String(agents.length) })}</div>
           </div>
           <button class="btn btn--sm" ?disabled=${props.loading} @click=${props.onRefresh}>
-            ${props.loading ? "Loading…" : "Refresh"}
+            ${props.loading ? t("agents.knowledge.loading") : t("common.refresh")}
           </button>
         </div>
         ${
@@ -156,8 +174,8 @@ export function renderAgents(props: AgentsProps) {
           !selectedAgent
             ? html`
                 <div class="card">
-                  <div class="card-title">Select an agent</div>
-                  <div class="card-sub">Pick an agent to inspect its workspace and tools.</div>
+                  <div class="card-title">${t("agents.selectAgent")}</div>
+                  <div class="card-sub">${t("agents.selectAgentSub")}</div>
                 </div>
               `
             : html`
@@ -203,6 +221,27 @@ export function renderAgents(props: AgentsProps) {
                         onFileDraftChange: props.onFileDraftChange,
                         onFileReset: props.onFileReset,
                         onFileSave: props.onFileSave,
+                      })
+                    : nothing
+                }
+                ${
+                  props.activePanel === "knowledge"
+                    ? renderAgentKnowledge({
+                        agentId: selectedAgent.id,
+                        agentKnowledgeList: props.agentKnowledgeList,
+                        agentKnowledgeStatus: props.agentKnowledgeStatus,
+                        agentKnowledgeLoading: props.agentKnowledgeLoading,
+                        agentKnowledgeError: props.agentKnowledgeError,
+                        agentKnowledgeFileActive: props.agentKnowledgeFileActive,
+                        agentKnowledgeFileContents: props.agentKnowledgeFileContents,
+                        agentKnowledgeFileDrafts: props.agentKnowledgeFileDrafts,
+                        agentKnowledgeSaving: props.agentKnowledgeSaving,
+                        onLoadFiles: props.onKnowledgeLoadFiles,
+                        onSelectFile: props.onKnowledgeSelectFile,
+                        onFileDraftChange: props.onKnowledgeFileDraftChange,
+                        onFileReset: props.onKnowledgeFileReset,
+                        onFileSave: props.onKnowledgeFileSave,
+                        onFileDelete: props.onKnowledgeFileDelete,
                       })
                     : nothing
                 }
@@ -320,12 +359,13 @@ function renderAgentHeader(
 
 function renderAgentTabs(active: AgentsPanel, onSelect: (panel: AgentsPanel) => void) {
   const tabs: Array<{ id: AgentsPanel; label: string }> = [
-    { id: "overview", label: "Overview" },
-    { id: "files", label: "Files" },
-    { id: "tools", label: "Tools" },
-    { id: "skills", label: "Skills" },
-    { id: "channels", label: "Channels" },
-    { id: "cron", label: "Cron Jobs" },
+    { id: "overview", label: String(t("tabs.overview")) },
+    { id: "files", label: String(t("tabs.files")) },
+    { id: "tools", label: String(t("tabs.tools")) },
+    { id: "skills", label: String(t("tabs.skills")) },
+    { id: "channels", label: String(t("tabs.channels")) },
+    { id: "cron", label: String(t("tabs.cron")) },
+    { id: "knowledge", label: String(t("tabs.knowledge")) },
   ];
   return html`
     <div class="agent-tabs">
@@ -414,41 +454,41 @@ function renderAgentOverview(params: {
 
   return html`
     <section class="card">
-      <div class="card-title">Overview</div>
-      <div class="card-sub">Workspace paths and identity metadata.</div>
+      <div class="card-title">${t("agents.overview.title")}</div>
+      <div class="card-sub">${t("agents.overview.subtitle")}</div>
       <div class="agents-overview-grid" style="margin-top: 16px;">
         <div class="agent-kv">
-          <div class="label">Workspace</div>
+          <div class="label">${t("agents.overview.workspace")}</div>
           <div class="mono">${workspace}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Primary Model</div>
+          <div class="label">${t("agents.overview.primaryModel")}</div>
           <div class="mono">${model}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Identity Name</div>
+          <div class="label">${t("agents.overview.identityName")}</div>
           <div>${identityName}</div>
           ${identityStatus ? html`<div class="agent-kv-sub muted">${identityStatus}</div>` : nothing}
         </div>
         <div class="agent-kv">
-          <div class="label">Default</div>
-          <div>${isDefault ? "yes" : "no"}</div>
+          <div class="label">${t("agents.overview.isDefault")}</div>
+          <div>${isDefault ? t("agents.overview.yes") : t("agents.overview.no")}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Identity Emoji</div>
+          <div class="label">${t("agents.overview.identityEmoji")}</div>
           <div>${identityEmoji}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Skills Filter</div>
-          <div>${skillFilter ? `${skillCount} selected` : "all skills"}</div>
+          <div class="label">${t("agents.overview.skillsFilter")}</div>
+          <div>${skillFilter ? t("agents.overview.skillsSelected", { count: String(skillCount || 0) }) : t("agents.overview.allSkills")}</div>
         </div>
       </div>
 
       <div class="agent-model-select" style="margin-top: 20px;">
-        <div class="label">Model Selection</div>
+        <div class="label">${t("agents.overview.modelSelection")}</div>
         <div class="row" style="gap: 12px; flex-wrap: wrap;">
           <label class="field" style="min-width: 260px; flex: 1;">
-            <span>Primary model${isDefault ? " (default)" : ""}</span>
+            <span>${isDefault ? t("agents.overview.primaryModelDefault") : t("agents.overview.primaryModelLabel")}</span>
             <select
               .value=${effectivePrimary ?? ""}
               ?disabled=${!configForm || configLoading || configSaving}
@@ -460,7 +500,7 @@ function renderAgentOverview(params: {
                   ? nothing
                   : html`
                       <option value="">
-                        ${defaultPrimary ? `Inherit default (${defaultPrimary})` : "Inherit default"}
+                        ${defaultPrimary ? t("agents.overview.inheritDefaultWith", { model: defaultPrimary }) : t("agents.overview.inheritDefault")}
                       </option>
                     `
               }
@@ -468,11 +508,11 @@ function renderAgentOverview(params: {
             </select>
           </label>
           <label class="field" style="min-width: 260px; flex: 1;">
-            <span>Fallbacks (comma-separated)</span>
+            <span>${t("agents.overview.fallbacksLabel")}</span>
             <input
               .value=${fallbackText}
               ?disabled=${!configForm || configLoading || configSaving}
-              placeholder="provider/model, provider/model"
+              placeholder=${t("agents.overview.fallbacksPlaceholder")}
               @input=${(e: Event) =>
                 onModelFallbacksChange(
                   agent.id,
@@ -483,14 +523,14 @@ function renderAgentOverview(params: {
         </div>
         <div class="row" style="justify-content: flex-end; gap: 8px;">
           <button class="btn btn--sm" ?disabled=${configLoading} @click=${onConfigReload}>
-            Reload Config
+            ${t("agents.overview.reloadConfig")}
           </button>
           <button
             class="btn btn--sm primary"
             ?disabled=${configSaving || !configDirty}
             @click=${onConfigSave}
           >
-            ${configSaving ? "Saving…" : "Save"}
+            ${configSaving ? t("agents.overview.saving") : t("agents.overview.save")}
           </button>
         </div>
       </div>

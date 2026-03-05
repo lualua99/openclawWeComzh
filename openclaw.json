@@ -1,0 +1,37 @@
+{
+  "agents": {
+    "list": [
+      {
+        "id": "claude-supervisor",
+        "default": true,
+        "name": "主核心指挥官",
+        "model": "gpt-4o",
+        "tools": { "allowlist": ["sessions_spawn", "write_todos", "read", "write"] },
+        "subagents": {
+          "allowAgents": ["*"]
+        }
+      },
+      {
+        "id": "research-agent",
+        "name": "资料搜集专员",
+        "model": "gpt-4o-mini",
+        "tools": { "allowlist": ["web_search", "web_fetch"] }
+      },
+      {
+        "id": "coder-agent",
+        "name": "代码编写高级专员",
+        "model": "deepseek-coder",
+        "tools": { "allowlist": ["exec", "apply_patch", "edit"] }
+      }
+    ]
+  },
+  "approvals": {
+    "exec": {
+      "requireApproval": true,
+      "allowlist": ["echo", "ls", "cat", "git status"]
+    },
+    "sessions_spawn": {
+      "requireApproval": false
+    }
+  }
+}

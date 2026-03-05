@@ -253,7 +253,7 @@ function renderGroupedMessage(
     "chat-bubble",
     canCopyMarkdown ? "has-copy" : "",
     opts.isStreaming ? "streaming" : "",
-    "fade-in",
+    "chat-bubble--anim-enter", // New class for animation
   ]
     .filter(Boolean)
     .join(" ");
@@ -268,7 +268,7 @@ function renderGroupedMessage(
 
   return html`
     <div class="${bubbleClasses}">
-      ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown!) : nothing}
+      ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown) : nothing}
       ${renderMessageImages(images)}
       ${
         extractedThinking && opts.showReasoning

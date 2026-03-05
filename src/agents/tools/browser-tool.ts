@@ -276,8 +276,8 @@ export function createBrowserTool(opts?: {
     name: "browser",
     description: [
       "Control the browser via OpenClaw's browser control server (status/start/stop/profiles/tabs/open/snapshot/screenshot/actions).",
-      'Profiles: use profile="chrome" for Chrome extension relay takeover (your existing Chrome tabs). Use profile="openclaw" for the isolated openclaw-managed browser.',
-      'If the user mentions the Chrome extension / Browser Relay / toolbar button / “attach tab”, ALWAYS use profile="chrome" (do not ask which profile).',
+      'Profiles: use profile="openclaw" for the isolated openclaw-managed standalone browser (default). Use profile="chrome" for Chrome extension relay takeover (your existing Chrome tabs).',
+      'If the user mentions the Chrome extension / Browser Relay / toolbar button / "attach tab", ALWAYS use profile="chrome" (do not ask which profile).',
       'When a node-hosted browser proxy is available, the tool may auto-route to it. Pin a node with node=<id|name> or target="node".',
       "Chrome extension relay needs an attached tab: user must click the OpenClaw Browser Relay toolbar icon on the tab (badge ON). If no tab is connected, ask them to attach it.",
       "When using refs from snapshot (e.g. e12), keep the same tab: prefer passing targetId from the snapshot response into subsequent actions (act/click/type/etc).",
@@ -289,7 +289,24 @@ export function createBrowserTool(opts?: {
     parameters: BrowserToolSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
+
+      // Defensive guard: if args are completely empty or action is missing, provide a clear
+      // error so the LLM can recover instead of seeing a raw schema validation failure.
+      if (!params || typeof params !== "object" || !("action" in params)) {
+        const validActions = [
+          "status", "start", "stop", "profiles", "tabs", "open", "focus", "close",
+          "snapshot", "screenshot", "navigate", "console", "pdf", "upload", "dialog",
+          "click", "type", "hover", "fill", "press", "act",
+        ].join(" | ");
+        throw new Error(
+          `Missing required parameter 'action'. You must specify which browser operation to perform.\n` +
+          `Valid values: ${validActions}\n` +
+          `Example: { "action": "snapshot" } or { "action": "navigate", "targetUrl": "https://example.com" }`,
+        );
+      }
+
       const action = readStringParam(params, "action", { required: true });
+
       const profile = readStringParam(params, "profile");
       const requestedNode = readStringParam(params, "node");
       let target = readStringParam(params, "target") as "sandbox" | "host" | "node" | undefined;
@@ -346,7 +363,7 @@ export function createBrowserTool(opts?: {
         requestedProfile: string | undefined,
         fn: (p: string) => Promise<T>,
       ): Promise<T> => {
-        const p = requestedProfile || "chrome";
+        const p = requestedProfile || "openclaw";
         try {
           return await fn(p);
         } catch (err) {
@@ -356,7 +373,7 @@ export function createBrowserTool(opts?: {
             console.warn(`[BrowserTool] Auto-failover from chrome to openclaw due to: ${msg}`);
             const result = await fn("openclaw");
             const hint =
-              "\n> [NOTE: Automatic failover from 'chrome' to 'openclaw' profile occurred because the extension was disconnected. PLEASE STAY with profile='openclaw' for all subsequent calls in this session for consistency.]\n";
+              "\n> [NOTE: Automatic failover from 'chrome' to 'openclaw' profile occurred because the extension was disconnected. Staying with profile='openclaw' for subsequent calls.]\n";
             if (
               result &&
               typeof result === "object" &&

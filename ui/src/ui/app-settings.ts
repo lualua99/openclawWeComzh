@@ -24,6 +24,7 @@ import { loadExecApprovals } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
+import { loadSandboxTaskPlan } from "./controllers/sandbox.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
 import {
@@ -59,6 +60,8 @@ type SettingsHost = {
   themeMedia: MediaQueryList | null;
   themeMediaHandler: ((event: MediaQueryListEvent) => void) | null;
   pendingGatewayUrl?: string | null;
+  sandboxPollTimer?: ReturnType<typeof setInterval> | null;
+  client?: unknown;
 };
 
 export function applySettings(host: SettingsHost, next: UiSettings) {
@@ -148,6 +151,28 @@ export function applySettingsFromUrl(host: SettingsHost) {
   window.history.replaceState({}, "", url.toString());
 }
 
+function startSandboxPolling(host: SettingsHost) {
+  if (host.sandboxPollTimer != null) {
+    return;
+  }
+  host.sandboxPollTimer = setInterval(() => {
+    void loadSessions(host as unknown as OpenClawApp);
+    // Respect the suppression flag set by /new reset
+    const hostAny = host as unknown as Record<string, unknown>;
+    if (!hostAny.sandboxTaskPlanSuppressed) {
+      void loadSandboxTaskPlan(host as unknown as OpenClawApp);
+    }
+  }, 5_000);
+}
+
+function stopSandboxPolling(host: SettingsHost) {
+  if (host.sandboxPollTimer == null) {
+    return;
+  }
+  clearInterval(host.sandboxPollTimer);
+  host.sandboxPollTimer = null;
+}
+
 export function setTab(host: SettingsHost, next: Tab) {
   if (host.tab !== next) {
     host.tab = next;
@@ -164,6 +189,11 @@ export function setTab(host: SettingsHost, next: Tab) {
     startDebugPolling(host as unknown as Parameters<typeof startDebugPolling>[0]);
   } else {
     stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
+  }
+  if (next === "sandbox") {
+    startSandboxPolling(host);
+  } else {
+    stopSandboxPolling(host);
   }
   void refreshActiveTab(host);
   syncUrlWithTab(host, next, false);
@@ -224,6 +254,10 @@ export async function refreshActiveTab(host: SettingsHost) {
         void loadCron(host);
       }
     }
+  }
+  if (host.tab === "sandbox") {
+    await loadSessions(host as unknown as OpenClawApp);
+    await loadSandboxTaskPlan(host as unknown as OpenClawApp);
   }
   if (host.tab === "nodes") {
     await loadNodes(host as unknown as OpenClawApp);
@@ -365,6 +399,11 @@ export function setTabFromRoute(host: SettingsHost, next: Tab) {
   } else {
     stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
   }
+  if (next === "sandbox") {
+    startSandboxPolling(host);
+  } else {
+    stopSandboxPolling(host);
+  }
   if (host.connected) {
     void refreshActiveTab(host);
   }
@@ -378,7 +417,7 @@ export function syncUrlWithTab(host: SettingsHost, tab: Tab, replace: boolean) {
   const currentPath = normalizePath(window.location.pathname);
   const url = new URL(window.location.href);
 
-  if (tab === "chat" && host.sessionKey) {
+  if ((tab === "chat" || tab === "sandbox") && host.sessionKey) {
     url.searchParams.set("session", host.sessionKey);
   } else {
     url.searchParams.delete("session");

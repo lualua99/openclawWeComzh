@@ -295,7 +295,7 @@ function extractSubagentOutputText(message: unknown): string {
   return "";
 }
 
-async function readLatestSubagentOutput(sessionKey: string): Promise<string | undefined> {
+export async function readLatestSubagentOutput(sessionKey: string): Promise<string | undefined> {
   try {
     const latestAssistant = await readLatestAssistantReply({
       sessionKey,

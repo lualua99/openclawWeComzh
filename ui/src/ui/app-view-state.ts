@@ -18,6 +18,8 @@ import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
+  AgentsMemoryListResult,
+  AgentsMemoryStatusResult,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   ConfigUiHints,
@@ -147,7 +149,7 @@ export type AppViewState = {
   toolsCatalogLoading: boolean;
   toolsCatalogError: string | null;
   toolsCatalogResult: ToolsCatalogResult | null;
-  agentsPanel: "overview" | "files" | "tools" | "skills" | "channels" | "cron";
+  agentsPanel: "overview" | "files" | "tools" | "skills" | "channels" | "cron" | "knowledge";
   agentFilesLoading: boolean;
   agentFilesError: string | null;
   agentFilesList: AgentsFilesListResult | null;
@@ -162,6 +164,19 @@ export type AppViewState = {
   agentSkillsError: string | null;
   agentSkillsReport: SkillStatusReport | null;
   agentSkillsAgentId: string | null;
+  agentKnowledgeLoading: boolean;
+  agentKnowledgeError: string | null;
+  agentKnowledgeList: AgentsMemoryListResult | null;
+  agentKnowledgeStatus: AgentsMemoryStatusResult | null;
+  agentKnowledgeFileContents: Record<string, string>;
+  agentKnowledgeFileDrafts: Record<string, string>;
+  agentKnowledgeFileActive: string | null;
+  agentKnowledgeSaving: boolean;
+  sandboxTaskPlan: import("./views/sandbox.js").TaskPlanSnapshot | null;
+  sandboxTaskPlanLoading: boolean;
+  sandboxTaskPlanError: string | null;
+  sandboxPollTimer: ReturnType<typeof setInterval> | null;
+  sandboxChatEvents: Record<string, unknown>;
   sessionsLoading: boolean;
   sessionsResult: SessionsListResult | null;
   sessionsError: string | null;

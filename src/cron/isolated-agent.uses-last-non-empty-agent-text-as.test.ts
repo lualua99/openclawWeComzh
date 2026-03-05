@@ -265,9 +265,10 @@ describe("runCronIsolatedAgentTurn", () => {
         prompt?: string;
       };
       const lines = call?.prompt?.split("\n") ?? [];
-      expect(lines[0]).toContain("[cron:job-1");
-      expect(lines[0]).toContain("do it");
-      expect(lines[1]).toMatch(/^Current time: .+ \(.+\)$/);
+      expect(lines[0]).toContain("[Scheduled Task Context]");
+      expect(lines[5]).toContain("[cron:job-1");
+      expect(lines[5]).toContain("do it");
+      expect(lines[6]).toMatch(/^Current time: .+ \(.+\)$/);
     });
   });
 
