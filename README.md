@@ -250,6 +250,141 @@ AI：明白，我记得上次我们停在 zod-schema.agent-runtime.ts 的第 674
 
 ---
 
+### 2b. 🔬 上下文记忆架构深度解析（Memory Architecture Internals）
+
+> 这是本 Fork 中「跨会话记忆」能力的技术原理说明。理解这个机制，才能正确使用 AI 的「记住上次...」能力。
+
+#### 核心问题：LLM 的 Context Window 是有限的
+
+每个模型都有一个上下文窗口上限（Context Window）：
+
+| 模型                     | Context Window              |
+| :----------------------- | :-------------------------- |
+| Claude Opus 4 / Sonnet 4 | 1,048,576 tokens（1M）      |
+| Qwen / DeepSeek          | 32K ~ 128K tokens           |
+| 本地配置 override        | 可在 `openclaw.json` 自定义 |
+
+对话越长，历史消息越多，token 用量不断累积。**一旦逼近上限，旧消息会被截断，AI 就"失忆"了**。
+
+#### 三层记忆架构
+
+```
+┌──────────────────────────────────────────────────────── ┐
+│  Layer 1：短期记忆（In-Session Transcript）              │
+│  ● 本次对话所有消息，直接作为 prompt 传给模型          │
+│  ● 消息越多，token 越多，直到逼近 context window 上限  │
+└───────────────────────────┬─────────────────────────────┘
+                            │ token 接近阈值时触发 ↓
+┌──────────────────────────────────────────────────────── ┐
+│  Layer 2：预压缩记忆落盘（Pre-Compaction Memory Flush）  │
+│  ● AI 自动把当前重要信息写入 memory/YYYY-MM-DD.md      │
+│  ● 然后进行 compaction：历史对话被压缩成摘要           │
+│  ● Token 用量归零，继续工作                            │
+└───────────────────────────┬─────────────────────────────┘
+                            │ 下次对话开始时 ↓
+┌──────────────────────────────────────────────────────── ┐
+│  Layer 3：长期语义检索（Memory Search / QMD）            │
+│  ● AI 强制先调用 memory_search(query) 检索历史记忆      │
+│  ● 向量语义匹配 memory/*.md 中的相关片段               │
+│  ● 将检索结果注入上下文，实现"跨会话记忆"             │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 关键触发机制：Memory Flush（`memory-flush.ts`）
+
+系统在每轮对话前评估是否需要触发 Memory Flush，触发条件为**任一满足**：
+
+```
+条件 A（Token 阈值）：
+  当前预估 token 数 ≥ contextWindow - reserveTokens(预留) - softThreshold(默认 4000)
+
+  等价公式：
+  promptTokens + lastOutputTokens + 本轮输入估算 ≥ 阈值
+
+条件 B（文件体积）：
+  transcript 文件大小 ≥ 2MB（可配置 forceFlushTranscriptBytes）
+```
+
+触发后，系统向模型发送一个特殊的隐藏 prompt（用户不可见）：
+
+```
+Pre-compaction memory flush.
+Store durable memories now (use memory/YYYY-MM-DD.md; create memory/ if needed).
+IMPORTANT: If the file already exists, APPEND new content only and do not overwrite existing entries.
+If nothing to store, reply with [SILENT].
+```
+
+模型收到后，会将当前对话中的重要信息**主动追加写入磁盘**到：
+
+```
+~/.openclaw/workspace/memory/
+  └── 2026-03-05.md   ← 按日期分文件，内容 APPEND，不覆盖
+```
+
+#### 下次对话如何读取记忆（`memory-tool.ts`）
+
+**每次对话开始前，AI 会被要求强制调用 `memory_search` 工具**（工具描述中标注了 `Mandatory recall step`）：
+
+```typescript
+// 工具描述（强制调用）
+"Mandatory recall step: semantically search MEMORY.md + memory/*.md
+ (and optional session transcripts) before answering questions about
+ prior work, decisions, dates, people, preferences, or todos"
+```
+
+检索流程：
+
+```
+memory_search("上次我们停在哪里")
+    │
+    ▼
+向量嵌入 → 语义匹配 memory/*.md 中所有片段
+    │
+    ▼
+返回 top-N 结果（含 path + 行号 + 内容摘要）
+    │
+    ▼ 需要看完整内容时
+memory_get("memory/2026-03-05.md", from=10, lines=30)
+    │
+    ▼
+只拉取所需片段，避免把整个文件塞进上下文（节省 token）
+```
+
+#### 记忆的局限性（重要）
+
+| 风险点              | 说明                                                                 |
+| :------------------ | :------------------------------------------------------------------- |
+| **AI 可能不写**     | 如果模型判断"本轮无值得保存的信息"，会回复 `[SILENT]` 跳过落盘       |
+| **Compaction 有损** | 历史对话被摘要后，细节可能丢失；不是完整历史回放                     |
+| **检索精度有限**    | `memory_search` 是向量语义检索，记忆很多时可能遗漏特定技术细节       |
+| **沙盒限制**        | Sandbox 模式下 `workspaceAccess != "rw"` 时，Memory Flush 被自动禁用 |
+
+#### 配置方式
+
+```json5
+// ~/.openclaw/openclaw.json
+{
+  agents: {
+    defaults: {
+      compaction: {
+        reserveTokensFloor: 8192, // compaction 时预留的最小 token 空间
+        memoryFlush: {
+          enabled: true,
+          softThresholdTokens: 4000, // 提前多少 token 触发 flush
+          forceFlushTranscriptBytes: "2mb", // 按文件体积强制触发
+          prompt: "...", // 自定义 flush 提示词（可选）
+        },
+      },
+    },
+  },
+  memory: {
+    citations: "auto", // "on" | "off" | "auto"（群组中默认关闭引用标注）
+  },
+}
+```
+
+> **实践建议**：对于长期需要"记住进度"的项目，建议在对话结束前主动说"请把我们今天的进展保存到记忆文件"，强制触发一次 Memory Flush，避免依赖系统的自动判断。
+
 ### 3. 🦞 Sandbox: 任务自动编排与高危拦截（Human-in-the-loop）
 
 **核心进化：从"被动问答"到"自主工作台"**
