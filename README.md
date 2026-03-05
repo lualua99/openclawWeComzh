@@ -106,6 +106,61 @@ pnpm gateway:watch
    - **沙盘 (Sandbox)**：监控 AI 的后台执行链与多智能体派发情况。
    - **配置 (Config)**：中文化的全局系统参数设置面板。
 
+## 📊 与上游官方版本对比 (Fork vs Upstream Comparison)
+
+> **本 fork 基于 [openclaw/openclaw](https://github.com/openclaw/openclaw) 官方开源项目，在完全继承其所有高阶能力的基础上，针对国内生态进行了深度本土化定制。**
+
+### 🔍 功能对比总览
+
+| 功能维度          | 🌍 官方上游 openclaw/openclaw                            | 🇨🇳 本 Fork luolin-ai/openclawWeComzh                             |
+| :---------------- | :------------------------------------------------------- | :--------------------------------------------------------------- |
+| **界面语言**      | 全英文界面                                               | 全链路中文化，从终端到 Web UI                                    |
+| **首选模型**      | Claude Opus / GPT-4 为主                                 | 深度适配 Qwen、DeepSeek、Kimi K2.5 等国内顶级模型                |
+| **模型接入方式**  | 官方 API 为主（Anthropic、OpenAI、OpenRouter）           | 额外支持 Moonshot、通义千问等国内 OpenAI 兼容 API                |
+| **深度思考渲染**  | 基础展示                                                 | 修复 `[(deep_think)]` / `<think>` 标签解析，完整流式呈现推理过程 |
+| **通信渠道**      | WhatsApp、Telegram、Discord、Slack、iMessage 等 20+ 渠道 | 继承全部，同时重点研发企业微信、微信等国内渠道（研发中）         |
+| **Telegram 支持** | ✅ 完整支持                                              | ✅ 深度适配 + 多 Bot 账号管理                                    |
+| **多智能体编排**  | ✅ Agent-to-Agent（sessions_send）                       | ✅ 继承全部 + Kimi 副脑双 Agent 配置示例开箱即用                 |
+| **Sandbox 沙盒**  | ✅ Docker 隔离 + 工具限制                                | ✅ 继承 + Human-in-the-loop 高危拦截，中文任务面板               |
+| **知识库能力**    | Memory QMD（向量检索）                                   | ✅ 继承 + 本地文档目录挂载的使用教程与示例                       |
+| **Web 控制台**    | 英文全功能 Web UI                                        | 中文化全功能 Web UI（Chat / Sandbox / Agents / Config）          |
+| **CLI 工具**      | `openclaw` 系列命令（英文输出）                          | 中文化 `onboard` 向导 + 中文友好错误提示                         |
+| **语音唤醒**      | macOS + iOS（VoiceWake）                                 | ✅ 继承（建议在官方 App 中使用）                                 |
+| **Canvas A2UI**   | ✅ Agent 驱动可视化工作区                                | ✅ 继承                                                          |
+| **安装方式**      | curl 一键安装 / npm / Nix / Docker                       | ✅ 继承，额外提供中文化安装向导截图文档                          |
+| **技能扩展**      | ClawHub 技能市场                                         | ✅ 继承（兼容 ClawHub）                                          |
+| **文档语言**      | 英文（docs.openclaw.ai）                                 | 中文化关键功能说明 + 本 README 的完整中文使用教程                |
+| **社区支持**      | Discord / GitHub                                         | GitHub + 中文开源社区（企微群等）                                |
+
+---
+
+### 🆙 本 Fork 额外新增能力（上游没有的）
+
+| 新增特性                             | 说明                                                                                       |
+| :----------------------------------- | :----------------------------------------------------------------------------------------- |
+| **`[(deep_think)]` 修复**            | 修复了 Qwen-Web 和 DeepSeek 推理模型在长上下文或多轮 Tool Call 场景下的标签截断 / 溢出 bug |
+| **强制工具调用机制**                 | 修复了模型在长对话后遗忘 XML 工具格式的问题，通过隐式约束注入保持稳定唤起                  |
+| **双 Agent 配置模板**                | 提供开箱即用的 Opus 主脑 + Kimi 副脑多 Agent 分工配置示例                                  |
+| **`sandboxTaskPlanSuppressed` 修复** | 修复新建会话时侧边栏任务面板残留旧规划的 bug；新建后自动清空                               |
+| **前端 Session 状态管理**            | `/new` 命令后正确重置所有轮询状态，防止历史数据污染新会话                                  |
+| **国内加速模型路由**                 | `moonshot` provider 直接接入，无需借助 OpenRouter 中转，降低延迟                           |
+
+---
+
+### 🧩 上游官方保留的核心能力（本 Fork 完整继承）
+
+> 以下所有能力均来自上游 [openclaw/openclaw](https://github.com/openclaw/openclaw)，本 fork 完整继承：
+
+- 🌐 **20+ 通信渠道**：WhatsApp、Telegram、Discord、Slack、Google Chat、Signal、iMessage、Feishu、LINE、Zalo 等
+- 🔧 **本地设备控制**：浏览器 CDP 控制、终端 bash、文件读写、截图、摄像头
+- 🤖 **Pi Agent 运行时**：RPC 工具流 + 流式输出，完整的会话模型
+- 🛡️ **Docker 沙盒隔离**：非主会话自动走 Docker 沙盒执行
+- 📱 **伴侣 App**：macOS 菜单栏 App + iOS/Android 节点
+- ⏰ **Cron + Webhook 自动化**：定时任务、事件驱动执行流
+- 🎙️ **Voice Wake + Talk Mode**：macOS/iOS 唤醒词 + Android 持续语音
+- 🗺️ **Skills + ClawHub**：技能注册中心，支持 bundled/managed/workspace 技能
+- 🔐 **Tailscale + SSH 远程网关**：安全暴露 Web UI，支持远程 Linux 机器部署
+
 ## ✨ 核心亮点 (Key Features)
 
 | 模块名称               | 特性说明                                                                                                                      |
