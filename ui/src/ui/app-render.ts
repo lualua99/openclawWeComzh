@@ -299,11 +299,20 @@ export function renderApp(state: AppViewState) {
             <button
               type="button"
               class="nav-collapse-toggle"
-              @click=${() =>
-                state.applySettings({
-                  ...state.settings,
-                  navCollapsed: !state.settings.navCollapsed,
-                })}
+              @click=${() => {
+                if (isChat && state.settings.chatFocusMode) {
+                  state.applySettings({
+                    ...state.settings,
+                    chatFocusMode: false,
+                    navCollapsed: false,
+                  });
+                } else {
+                  state.applySettings({
+                    ...state.settings,
+                    navCollapsed: !state.settings.navCollapsed,
+                  });
+                }
+              }}
               title="${state.settings.navCollapsed ? t("nav.expand") : t("nav.collapse")}"
               aria-label="${state.settings.navCollapsed ? t("nav.expand") : t("nav.collapse")}"
             >
