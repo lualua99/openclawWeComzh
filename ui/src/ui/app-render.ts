@@ -1,5 +1,4 @@
-import { html, nothing } from "lit";
-import { html, nothing } from "lit";
+
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { t, i18n } from "../i18n/index.ts";
 import { refreshChatAvatar } from "./app-chat.ts";

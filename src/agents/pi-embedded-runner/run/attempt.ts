@@ -1157,8 +1157,17 @@ export async function runEmbeddedAttempt(
             (evt.data)?.phase === "result" &&
             (subscription?.getConsecutiveToolErrors() ?? 0) >= 3
           ) {
-            log.warn(`aborting run ${params.runId} due to 3 consecutive tool errors`);
-            abortRun(false, new Error("consecutive_tool_errors"));
+            log.warn(`intercepting run ${params.runId} due to 3 consecutive tool errors - triggering reflection mode (Z²)`);
+            subscription?.resetConsecutiveToolErrors();
+            activeSession
+              .steer(
+                "System Hook: You have failed 3 times in a row. You are now in Reflection Mode (Z²). " +
+                  "You are FORBIDDEN from calling any tools in this turn. " +
+                  "You must output a detailed analysis of the failure in a `<reflection>` block and propose a new approach (C) before proceeding.",
+              )
+              .catch((err) => {
+                log.error(`failed to inject reflection steering: ${String(err)}`);
+              });
           }
         },
         enforceFinalTag: params.enforceFinalTag,

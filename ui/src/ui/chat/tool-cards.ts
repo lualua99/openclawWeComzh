@@ -118,7 +118,7 @@ function renderTodosCard(card: ToolCard) {
           args.title || args.taskId
             ? html`<div class="chat-plan-todo-item ${isDone ? "chat-plan-todo-item--done" : isActive ? "chat-plan-todo-item--active" : "chat-plan-todo-item--pending"}">
               <span class="chat-plan-todo-icon">${isDone ? "✅" : isActive ? "🔄" : "⏳"}</span>
-              <span>${args.title || `Task #${String(args.taskId !== undefined && args.taskId !== null ? JSON.stringify(args.taskId) : "unknown")}`}</span>
+              <span>${args.title || `Task #${typeof args.taskId === "string" || typeof args.taskId === "number" ? args.taskId : "unknown"}`}</span>
             </div>`
             : nothing
         }

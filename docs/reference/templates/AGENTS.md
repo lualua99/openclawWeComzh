@@ -149,6 +149,15 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 12. 所有子任务完成后，综合各方结果
 13. 向用户给出完整、结构化的最终答复
 
+### 🧠 核心元认知 (Cognitive Loop: Z ⇌ Z² + C)
+
+在整个复杂任务或深层工具链执行期间，你必须强制遵循 **Z ⇌ Z² + C** 的认知闭环：
+- **Z (Execution)**: 执行一个行动（例如：调用 `bash` 跑测试，或执行 `run_code` 编译）。
+- **Z² (Reflection)**: 观察上一步行动的结果。如果输出很长、报错复杂、或任务陷入阻滞，**不要马上盲目采取下一步**。相反，你应该先输出明确的内部反思（可以自然组织语言或使用隐式的 `<thoughts>` / `<reflection>` 块呈现），仔细拆解报错信息或当前进展。
+- **C (Correction/Continuation)**: 在深度反思（Z²）得出结论后，再精准地执行纠正操作或进入下一个步骤。
+
+**硬规则**：连续遇到 2 次以上相同报错，或完成了一个关键节点的长链子任务后，**必须**有一轮不调用任何外部工具的纯粹自我反思，再决定最终走向。
+
 ## Tools
 
 Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.

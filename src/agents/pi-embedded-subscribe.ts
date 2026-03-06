@@ -679,6 +679,9 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     didSendViaMessagingTool: () => messagingToolSentTexts.length > 0,
     getLastToolError: () => (state.lastToolError ? { ...state.lastToolError } : undefined),
     getConsecutiveToolErrors: () => state.consecutiveToolErrors,
+    resetConsecutiveToolErrors: () => {
+      state.consecutiveToolErrors = 0;
+    },
     getUsageTotals,
     getCompactionCount: () => compactionCount,
     waitForCompactionRetry: () => {
