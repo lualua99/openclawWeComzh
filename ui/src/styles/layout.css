@@ -62,7 +62,7 @@
   padding-top: 0;
 }
 
-.shell--chat-focus .content > * + * {
+.shell--chat-focus .content>*+* {
   margin-top: 0;
 }
 
@@ -89,8 +89,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
-  background: #ffffff;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
   z-index: 40;
 }
 
@@ -487,7 +487,7 @@
   padding-bottom: 0;
 }
 
-.content--chat > * + * {
+.content--chat>*+* {
   margin-top: 0;
 }
 
@@ -545,7 +545,7 @@
   gap: 16px;
 }
 
-.content--chat .content-header > div:first-child {
+.content--chat .content-header>div:first-child {
   text-align: left;
 }
 
