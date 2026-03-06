@@ -18,9 +18,14 @@
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%E2%89%A5%2022-green.svg?style=for-the-badge" alt="Node Version Requirement"></a>
 </p>
 
-## 🚀 最新特性与更新 (Recent Updates)
+## 核心突破：赋予多智能体系统真正的“元认知”自我进化能力与“发散修正”能力\*\*
 
-[Vison (系统愿景)](VISION.md)
+在处理极其复杂的长时间维度任务时，传统的自主 Agent 往往容易陷入动作“死循环”——例如为了解决一个 Bug 不断地重复编辑和报错。本项目针对性地引入了基于复利折叠（Z ⇌ Z² + C）的监控环流：
+
+- **`chaosScore` 混沌度量器**：底层的订阅分发中心（`pi-embedded-subscribe`）会实时监视动作指纹（Fingerprint）。当检测到 Agent 在原地打转或频繁报错时，会自动增加系统混沌值。
+- **分形反思机制（Fractal Reflection）**：当混沌值越过安全阈值时，自动触发系统级侧入式钩子（Hooks）。强制打断当前发散的执行死循环（Divergence），并向主脑注入强力的人工提示，要求其调整方向或降维打击——例如指派具有特定上下文的子智能体（Subagent）去重新梳理问题，而不是一根筋死磕。
+
+## 🚀 最新特性与更新 (Recent Updates)
 
 > _注：大部分高阶架构原理解析可参考上游官方英文文档：[Docs](https://docs.openclaw.ai) / [DeepWiki](https://deepwiki.com/openclaw/openclaw)_
 
