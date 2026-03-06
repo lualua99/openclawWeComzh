@@ -77,9 +77,13 @@ const TASK_RESULT_REGEX = /<task_result>\s*([\s\S]*?)\s*<\/task_result>/;
  * Returns undefined if no valid block is found.
  */
 export function extractTaskResult(text: string | undefined): TaskResult | undefined {
-  if (!text) return undefined;
+  if (!text) {
+    return undefined;
+  }
   const match = TASK_RESULT_REGEX.exec(text);
-  if (!match?.[1]) return undefined;
+  if (!match?.[1]) {
+    return undefined;
+  }
   try {
     const parsed = JSON.parse(match[1].trim());
     if (
@@ -169,10 +173,16 @@ function buildCompletionDeliveryMessage(params: {
   const metadataLines: string[] = [];
   if (taskResult) {
     metadataLines.push(`- Status: ${taskResult.status}`);
-    if (taskResult.summary) metadataLines.push(`- Summary: ${taskResult.summary}`);
-    if (taskResult.blockers?.length) metadataLines.push(`- Blockers: ${taskResult.blockers.join("; ")}`);
+    if (taskResult.summary) {
+      metadataLines.push(`- Summary: ${taskResult.summary}`);
+    }
+    if (taskResult.blockers?.length) {
+      metadataLines.push(`- Blockers: ${taskResult.blockers.join("; ")}`);
+    }
   }
-  if (params.model) metadataLines.push(`- Model: ${params.model}`);
+  if (params.model) {
+    metadataLines.push(`- Model: ${params.model}`);
+  }
   if (typeof params.durationMs === "number") {
     metadataLines.push(`- Duration: ${(params.durationMs / 1000).toFixed(1)}s`);
   }
@@ -181,7 +191,9 @@ function buildCompletionDeliveryMessage(params: {
   }
 
   const parts = [header];
-  if (hasCleanFindings) parts.push(cleanFindings);
+  if (hasCleanFindings) {
+    parts.push(cleanFindings);
+  }
   if (metadataLines.length > 0) {
     parts.push(`[Task Metadata]\n${metadataLines.join("\n")}`);
   }
@@ -1056,12 +1068,12 @@ export function buildSubagentSystemPrompt(params: {
   const lines = [
     "# Subagent Context",
     "",
-    `You are a **subagent** spawned by the ${parentLabel} for a specific task.`,
+    `You are a **Specialized Worker Agent** delegated by a Supervisor (${parentLabel}).`,
     "",
     "## Your Role",
-    `- You were created to handle: ${taskText}`,
-    "- Complete this task. That's your entire purpose.",
-    `- You are NOT the ${parentLabel}. Don't try to be.`,
+    `- You were created to act as an expert for a specific task: ${taskText}`,
+    "- Complete this task using your tools. That's your ONLY purpose. Do not attempt to tackle the broader user request unless it's explicitly part of your task.",
+    `- You are NOT the ${parentLabel}. You are a focused specialist.`,
     "",
     "## Rules",
     "1. **Stay focused** - Do your assigned task, nothing else",
@@ -1348,7 +1360,7 @@ export async function runSubagentAnnounceFlow(params: {
     const announceSessionId = childSessionId || "unknown";
     let findings = reply || "(no output)";
     let updatedSharedContextRaw = "";
-    
+
     // Extract the <updated_shared_context> payload if the subagent modified the context
     const contextRegex = /<updated_shared_context>\s*([\s\S]*?)\s*<\/updated_shared_context>/i;
     const contextMatch = findings.match(contextRegex);
@@ -1455,11 +1467,12 @@ export async function runSubagentAnnounceFlow(params: {
       outcome,
       announceType,
       model: entryForRetry?.model,
-      durationMs: params.endedAt && params.startedAt ? params.endedAt - params.startedAt : undefined,
+      durationMs:
+        params.endedAt && params.startedAt ? params.endedAt - params.startedAt : undefined,
       retryCount: entryForRetry?.retryCount,
       maxRetries: entryForRetry?.maxRetries,
     });
-    
+
     // Append the updated context nicely formatted
     if (updatedSharedContextRaw) {
       const contextStr = `\n\n[Updated Shared Context]:\n\`\`\`json\n${updatedSharedContextRaw}\n\`\`\``;
