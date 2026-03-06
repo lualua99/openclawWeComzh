@@ -1,7 +1,9 @@
 # 🦞 openclawWeComzh — Personal AI Assistant
 
 > **为国内生态倾力打造的 OpenClaw 深度中文化版本。**
-> 这是一个让你可以在本地私有化运行、掌控全局的智能个人助理。
+> 这是一个让你可以在本地私有化运行、掌控全局的私人 AI 智能体工作流引擎。
+>
+> 📦 **开源仓库主页**: [https://github.com/luolin-ai/openclawWeComzh](https://github.com/luolin-ai/openclawWeComzh)
 
 <p align="center">
     <picture>
@@ -22,8 +24,8 @@
 
 > _注：大部分高阶架构原理解析可参考上游官方英文文档：[Docs](https://docs.openclaw.ai) / [DeepWiki](https://deepwiki.com/openclaw/openclaw)_
 
-🎉 **v2026.3.x 核心里程碑 (重磅发布)**
-_[开源仓库主页：luolin-ai/openclawWeComzh](https://github.com/luolin-ai/openclawWeComzh)_
+🎉 **v2025.3.x 核心里程碑 (重磅发布)**
+_[当前项目仓库：luolin-ai/openclawWeComzh](https://github.com/luolin-ai/openclawWeComzh)_
 
 - 🦞 **Sandbox 自动化工作流编排**：从传统的“被动问答对话框”进化为“主动派单工作台”。只需下发宏大目标，AI 即可拆解目标并生成 `task.md` 规划清单，每执行一步都会自我打卡标记状态。全面引入对高危终端命令的弹窗拦截审核机制（Human-in-the-loop）。
 - 🧠 **本地私有知识库引擎挂载**：在多轮跨会话之间建立长线上下文记忆。直接让 AI 挂载本地项目文档和代码规范库，在遇到技术卡点时自主翻阅资料寻找突破。
@@ -31,10 +33,12 @@ _[开源仓库主页：luolin-ai/openclawWeComzh](https://github.com/luolin-ai/o
 - 🌍 **浏览器自动化持久化升级**：浏览器 Profile 与 Agent Session 自动绑定，跨次运行保留登录态（Cookie/localStorage）。
 - ⚡️ **Batch 快照效率提升**：批量浏览器操作完成后自动暴露最终页面快照，减少 AI 解析中间过程的开销。
 - 💻 **UI 浏览器工具可视化**：聊天界面浏览器工具卡支持内联前端截图渲染与快照摘要展示，过程完全可视。
+- ♾️ **Z ⇌ Z² + C 认知环流深度融合**：赋予多智能体系统真正的“元认知”与“发散修正”能力。底层实时监视执行死循环，当混沌值（`chaosScore`）越过阈值时触发侧入式拦截，强制要求 AI 降维拆解或指派专职子代理，避免原地打结。
+- 🎨 **Canvas A2UI 智能体交互画布**：告别纯文本，直接在侧边栏生成高交互性的前端组件、表单与图表。重构了底层的 Canvas 编译链，集成了下一代 Rust 打包器 `rolldown`，支持毫秒级页面热重载与极速组件通信。
 
 ---
 
-🎉 **v2026.2.x 历史核心里程碑**
+🎉 **v2025.2.x 历史核心里程碑**
 
 - 🧠 **Qwen / DeepSeek 流式深度整合**：
   - **思考过程全解析**：彻底修复了 Qwen-Web 和 DeepSeek 模型在输出深度推理标签 (`[(deep_think)]` / `<think>`) 时的截断或溢出问题。流式输出期间，UI 界面将优雅且平滑地展开“深度思考中 (Deep Thinking...)”折叠面板，展现 AI 推理全貌。
@@ -325,7 +329,7 @@ If nothing to store, reply with [SILENT].
 
 ```
 ~/.openclaw/workspace/memory/
-  └── 2026-03-05.md   ← 按日期分文件，内容 APPEND，不覆盖
+  └── 2025-03-07.md   ← 按日期分文件，内容 APPEND，不覆盖
 ```
 
 #### 下次对话如何读取记忆（`memory-tool.ts`）
@@ -351,7 +355,7 @@ memory_search("上次我们停在哪里")
 返回 top-N 结果（含 path + 行号 + 内容摘要）
     │
     ▼ 需要看完整内容时
-memory_get("memory/2026-03-05.md", from=10, lines=30)
+memory_get("memory/2025-03-07.md", from=10, lines=30)
     │
     ▼
 只拉取所需片段，避免把整个文件塞进上下文（节省 token）
