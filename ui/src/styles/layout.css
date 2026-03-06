@@ -221,19 +221,14 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0;
-  background: #ffffff;
-  border-right: 1px solid #f0f0f0;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border);
   scrollbar-width: none;
   transition:
     width var(--shell-focus-duration) var(--shell-focus-ease),
     padding var(--shell-focus-duration) var(--shell-focus-ease),
     opacity var(--shell-focus-duration) var(--shell-focus-ease);
   min-height: 0;
-}
-
-:root[data-theme="dark"] .nav {
-  background: #1f1f1f;
-  border-right-color: #303030;
 }
 
 .nav::-webkit-scrollbar {
@@ -635,7 +630,7 @@
     border-right: 1px solid var(--border);
     border-bottom: none;
     padding: 0;
-    background: #ffffff;
+    background: var(--bg-elevated);
     transform: translateX(-100%);
     transition: transform 0.3s ease;
   }
