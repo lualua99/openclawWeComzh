@@ -205,8 +205,7 @@ export function renderTodosCard(card: ToolCard) {
 // visible in the chat stream without needing a separate preview window.
 function renderBrowserCard(card: ToolCard) {
   const args = (card.args ?? {}) as Record<string, unknown>;
-  const action =
-    typeof args.action === "string" ? args.action.trim() : "";
+  const action = typeof args.action === "string" ? args.action.trim() : "";
 
   // ── Call: screenshot in progress
   if (card.kind === "call" && action === "screenshot") {
@@ -273,9 +272,7 @@ function renderBrowserCard(card: ToolCard) {
         // Convert absolute path to gateway-served media URL.
         // Gateway serves /media/* from the ~/.openclaw/media directory.
         const fileName = filePath.split("/").pop() ?? "";
-        const imgSrc = fileName
-          ? `/media/browser/${fileName}`
-          : null;
+        const imgSrc = fileName ? `/media/browser/${fileName}` : null;
         const pageUrl = typeof parsed.url === "string" ? parsed.url : "";
         return html`
           <div class="chat-tool-card chat-browser-card chat-browser-card--screenshot">
@@ -284,12 +281,15 @@ function renderBrowserCard(card: ToolCard) {
                 <span class="chat-browser-card__icon">🖼️</span>
                 <span>Browser Screenshot</span>
               </div>
-              ${pageUrl
-                ? html`<span class="chat-tool-card__detail" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.7rem;opacity:0.5;">${pageUrl}</span>`
-                : nothing}
+              ${
+                pageUrl
+                  ? html`<span class="chat-tool-card__detail" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.7rem;opacity:0.5;">${pageUrl}</span>`
+                  : nothing
+              }
             </div>
-            ${imgSrc
-              ? html`
+            ${
+              imgSrc
+                ? html`
                 <a href=${imgSrc} target="_blank" rel="noopener" style="display:block;">
                   <img
                     src=${imgSrc}
@@ -303,16 +303,15 @@ function renderBrowserCard(card: ToolCard) {
                       object-fit: contain;
                       background: rgba(0,0,0,0.2);
                     "
-                    @error=${
-                      (e: Event) => {
-                        const img = e.target as HTMLImageElement;
-                        img.style.display = "none";
-                      }
-                    }
+                    @error=${(e: Event) => {
+                      const img = e.target as HTMLImageElement;
+                      img.style.display = "none";
+                    }}
                   />
                 </a>
               `
-              : html`<div class="chat-tool-card__preview mono" style="font-size:0.7rem;opacity:0.6;">${filePath}</div>`}
+                : html`<div class="chat-tool-card__preview mono" style="font-size:0.7rem;opacity:0.6;">${filePath}</div>`
+            }
           </div>
         `;
       }
@@ -340,9 +339,11 @@ function renderBrowserCard(card: ToolCard) {
                 ${truncated ? "· truncated" : ""}
               </span>
             </div>
-            ${pageUrl
-              ? html`<div class="chat-tool-card__detail" style="font-size:0.72rem;opacity:0.55;word-break:break-all;">${pageUrl}</div>`
-              : nothing}
+            ${
+              pageUrl
+                ? html`<div class="chat-tool-card__detail" style="font-size:0.72rem;opacity:0.55;word-break:break-all;">${pageUrl}</div>`
+                : nothing
+            }
             <div class="chat-tool-card__preview mono" style="
               max-height: 100px;
               overflow: hidden;
@@ -431,18 +432,19 @@ export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: 
   const hasText = Boolean(card.text?.trim());
 
   const canClick = Boolean(onOpenSidebar);
-  const handleClick = canClick && onOpenSidebar
-    ? () => {
-        if (hasText && card.text) {
-          onOpenSidebar(formatToolOutputForSidebar(card.text));
-          return;
+  const handleClick =
+    canClick && onOpenSidebar
+      ? () => {
+          if (hasText && card.text) {
+            onOpenSidebar(formatToolOutputForSidebar(card.text));
+            return;
+          }
+          const info = `## ${display.label}\n\n${
+            detail ? `**Command:** \`${detail}\`\n\n` : ""
+          }*No output — tool completed successfully.*`;
+          onOpenSidebar(info);
         }
-        const info = `## ${display.label}\n\n${
-          detail ? `**Command:** \`${detail}\`\n\n` : ""
-        }*No output — tool completed successfully.*`;
-        onOpenSidebar(info);
-      }
-    : undefined;
+      : undefined;
 
   const isShort = hasText && (card.text?.length ?? 0) <= TOOL_INLINE_THRESHOLD;
   const showCollapsed = hasText && !isShort;
