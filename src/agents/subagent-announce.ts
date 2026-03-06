@@ -47,6 +47,8 @@ import { isAnnounceSkip } from "./tools/sessions-send-helpers.js";
 const FAST_TEST_MODE = process.env.OPENCLAW_TEST_FAST === "1";
 const FAST_TEST_RETRY_INTERVAL_MS = 8;
 const FAST_TEST_REPLY_CHANGE_WAIT_MS = 20;
+import type { SubagentRunRecord } from "./subagent-registry.types.js";
+
 const DEFAULT_SUBAGENT_ANNOUNCE_TIMEOUT_MS = 60_000;
 const MAX_TIMER_SAFE_TIMEOUT_MS = 2_147_000_000;
 const DIRECT_ANNOUNCE_TRANSIENT_RETRY_DELAYS_MS = FAST_TEST_MODE
@@ -57,6 +59,56 @@ type ToolResultMessage = {
   role?: unknown;
   content?: unknown;
 };
+
+/**
+ * Structured result extracted from a subagent's `<task_result>` XML block.
+ * Enables programmatic evaluation of subagent task quality.
+ */
+export type TaskResult = {
+  status: "success" | "partial" | "failed";
+  summary: string;
+  blockers?: string[];
+};
+
+const TASK_RESULT_REGEX = /<task_result>\s*([\s\S]*?)\s*<\/task_result>/;
+
+/**
+ * Extract and parse the `<task_result>` XML block from subagent output.
+ * Returns undefined if no valid block is found.
+ */
+export function extractTaskResult(text: string | undefined): TaskResult | undefined {
+  if (!text) return undefined;
+  const match = TASK_RESULT_REGEX.exec(text);
+  if (!match?.[1]) return undefined;
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof parsed.status === "string" &&
+      ["success", "partial", "failed"].includes(parsed.status)
+    ) {
+      return {
+        status: parsed.status as TaskResult["status"],
+        summary: typeof parsed.summary === "string" ? parsed.summary : "",
+        blockers: Array.isArray(parsed.blockers)
+          ? parsed.blockers.filter((b: unknown) => typeof b === "string")
+          : undefined,
+      };
+    }
+  } catch {
+    // Malformed JSON inside <task_result> — ignore.
+  }
+  return undefined;
+}
+
+/**
+ * Strip the `<task_result>` XML block from the findings text so the
+ * human-readable portion is clean.
+ */
+export function stripTaskResultBlock(text: string): string {
+  return text.replace(TASK_RESULT_REGEX, "").trim();
+}
 
 function resolveSubagentAnnounceTimeoutMs(cfg: ReturnType<typeof loadConfig>): number {
   const configured = cfg.agents?.defaults?.subagents?.announceTimeoutMs;
@@ -72,6 +124,10 @@ function buildCompletionDeliveryMessage(params: {
   spawnMode?: SpawnSubagentMode;
   outcome?: SubagentRunOutcome;
   announceType?: SubagentAnnounceType;
+  model?: string;
+  durationMs?: number;
+  retryCount?: number;
+  maxRetries?: number;
 }): string {
   const findingsText = params.findings.trim();
   if (isAnnounceSkip(findingsText)) {
@@ -82,11 +138,22 @@ function buildCompletionDeliveryMessage(params: {
   if (params.announceType === "cron job") {
     return hasFindings ? findingsText : "";
   }
+
+  // Extract structured task result from the findings.
+  const taskResult = extractTaskResult(findingsText);
+  // Clean the findings text by removing the <task_result> XML block.
+  const cleanFindings = taskResult ? stripTaskResultBlock(findingsText) : findingsText;
+  const hasCleanFindings = cleanFindings.length > 0 && cleanFindings !== "(no output)";
+
   const header = (() => {
-    if (params.outcome?.status === "error") {
+    // Use taskResult status for more accurate headers when available.
+    if (taskResult?.status === "failed" || params.outcome?.status === "error") {
       return params.spawnMode === "session"
         ? `❌ Subagent ${params.subagentName} failed this task (session remains active)`
         : `❌ Subagent ${params.subagentName} failed`;
+    }
+    if (taskResult?.status === "partial") {
+      return `⚠️ Subagent ${params.subagentName} partially completed`;
     }
     if (params.outcome?.status === "timeout") {
       return params.spawnMode === "session"
@@ -97,10 +164,28 @@ function buildCompletionDeliveryMessage(params: {
       ? `✅ Subagent ${params.subagentName} completed this task (session remains active)`
       : `✅ Subagent ${params.subagentName} finished`;
   })();
-  if (!hasFindings) {
-    return header;
+
+  // Build structured metadata section.
+  const metadataLines: string[] = [];
+  if (taskResult) {
+    metadataLines.push(`- Status: ${taskResult.status}`);
+    if (taskResult.summary) metadataLines.push(`- Summary: ${taskResult.summary}`);
+    if (taskResult.blockers?.length) metadataLines.push(`- Blockers: ${taskResult.blockers.join("; ")}`);
   }
-  return `${header}\n\n${findingsText}`;
+  if (params.model) metadataLines.push(`- Model: ${params.model}`);
+  if (typeof params.durationMs === "number") {
+    metadataLines.push(`- Duration: ${(params.durationMs / 1000).toFixed(1)}s`);
+  }
+  if (typeof params.retryCount === "number") {
+    metadataLines.push(`- Retry: ${params.retryCount}/${params.maxRetries ?? 2}`);
+  }
+
+  const parts = [header];
+  if (hasCleanFindings) parts.push(cleanFindings);
+  if (metadataLines.length > 0) {
+    parts.push(`[Task Metadata]\n${metadataLines.join("\n")}`);
+  }
+  return parts.join("\n\n");
 }
 
 function summarizeDeliveryError(error: unknown): string {
@@ -992,6 +1077,26 @@ export function buildSubagentSystemPrompt(params: {
     `- Any relevant details the ${parentLabel} should know`,
     "- Keep it concise but informative",
     "",
+    "## Structured Result (REQUIRED)",
+    "At the very END of your final response, you MUST include a structured result block wrapped in XML tags:",
+    "```",
+    "<task_result>",
+    '{"status": "success", "summary": "one-line summary of what was accomplished"}',
+    "</task_result>",
+    "```",
+    "The `status` field MUST be one of:",
+    '- `"success"` — task fully completed as requested',
+    '- `"partial"` — task partially done; include a `"blockers"` array describing what prevented completion',
+    '- `"failed"` — task could not be completed; include a `"blockers"` array with reasons',
+    "",
+    "Example for a failed task:",
+    "```",
+    "<task_result>",
+    '{"status": "failed", "summary": "Could not access the API", "blockers": ["AUTH_ERROR: API key expired"]}',
+    "</task_result>",
+    "```",
+    "This block is machine-parsed. Always include it, even on failure.",
+    "",
     "## What You DON'T Do",
     `- NO user conversations (that's ${parentLabel}'s job)`,
     "- NO external messages (email, tweets, etc.) unless explicitly tasked with a specific recipient/channel",
@@ -1320,12 +1425,39 @@ export async function runSubagentAnnounceFlow(params: {
       startedAt: params.startedAt,
       endedAt: params.endedAt,
     });
+    let entryForRetry: SubagentRunRecord | undefined;
+    try {
+      const { loadSubagentRun } = await import("./subagent-registry.js");
+      entryForRetry = loadSubagentRun(params.childRunId);
+    } catch {
+      // Best-effort load.
+    }
+
+    if (entryForRetry) {
+      const { evaluateAndRetryIfNeeded } = await import("./subagent-retry.js");
+      const retryTriggered = await evaluateAndRetryIfNeeded({
+        entry: entryForRetry,
+        output: reply,
+        outcome,
+      });
+      // If a retry is actively spawned, we suppress this failure announcement.
+      // The retry attempt will announce when *it* finishes.
+      if (retryTriggered) {
+        shouldDeleteChildSession = false; // keep old session for debugging
+        return true; // Mark announce as "delivered/handled" so it gets cleaned up
+      }
+    }
+
     completionMessage = buildCompletionDeliveryMessage({
       findings,
       subagentName,
       spawnMode: params.spawnMode,
       outcome,
       announceType,
+      model: entryForRetry?.model,
+      durationMs: params.endedAt && params.startedAt ? params.endedAt - params.startedAt : undefined,
+      retryCount: entryForRetry?.retryCount,
+      maxRetries: entryForRetry?.maxRetries,
     });
     
     // Append the updated context nicely formatted

@@ -45,6 +45,10 @@ import { resolveAgentTimeoutMs } from "./timeout.js";
 
 export type { SubagentRunRecord } from "./subagent-registry.types.js";
 
+export function loadSubagentRun(runId: string): SubagentRunRecord | undefined {
+  return subagentRuns.get(runId);
+}
+
 const subagentRuns = new Map<string, SubagentRunRecord>();
 let sweeper: NodeJS.Timeout | null = null;
 let listenerStarted = false;
@@ -905,6 +909,9 @@ export function registerSubagentRun(params: {
   runTimeoutSeconds?: number;
   expectsCompletionMessage?: boolean;
   spawnMode?: "run" | "session";
+  retryCount?: number;
+  maxRetries?: number;
+  originalRunId?: string;
 }) {
   const now = Date.now();
   const cfg = loadConfig();
@@ -932,6 +939,9 @@ export function registerSubagentRun(params: {
     startedAt: now,
     archiveAtMs,
     cleanupHandled: false,
+    retryCount: params.retryCount,
+    maxRetries: params.maxRetries,
+    originalRunId: params.originalRunId,
   });
   ensureListener();
   persistSubagentRuns();
