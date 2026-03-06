@@ -1,5 +1,11 @@
 import { resolveBrowserExecutableForPlatform } from "../chrome.executables.js";
 import { createBrowserProfilesService } from "../profiles-service.js";
+import {
+  listSessionProfiles,
+  removeSessionProfile,
+  sessionKeyToProfileName,
+  setSessionProfile,
+} from "../session-profile-map.js";
 import type { BrowserRouteContext, ProfileContext } from "../server-context.js";
 import { resolveProfileContext } from "./agent.shared.js";
 import type { BrowserRequest, BrowserResponse, BrowserRouteRegistrar } from "./types.js";
@@ -198,5 +204,85 @@ export function registerBrowserBasicRoutes(app: BrowserRouteRegistrar, ctx: Brow
       }
       jsonError(res, 500, msg);
     }
+  });
+
+  // ─── Session → Profile Persistence API ───────────────────────────────────────
+  // Enables agents to maintain login state across runs for Feishu, Douyin, etc.
+  // Workflow:
+  //   1. Agent calls browser with ?sessionName=feishu-task
+  //   2. First run: use default profile, agent logs in manually or via browser automation
+  //   3. Agent calls POST /profiles/session-bind to persist the mapping
+  //   4. Subsequent runs: browser ?sessionName=feishu-task auto-uses the bound profile
+
+  // GET /profiles/session-map — list all session → profile bindings
+  app.get("/profiles/session-map", (_req, res) => {
+    try {
+      const map = listSessionProfiles();
+      res.json({ ok: true, bindings: map });
+    } catch (err) {
+      jsonError(res, 500, String(err));
+    }
+  });
+
+  // POST /profiles/session-bind — bind a session key to a profile name
+  // Body: { sessionName: string, profile?: string }
+  // If profile is omitted, auto-generates a profile name from the session key.
+  app.post("/profiles/session-bind", async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const sessionName = toStringOrEmpty(body.sessionName);
+    if (!sessionName) {
+      return jsonError(res, 400, "sessionName is required");
+    }
+
+    // Resolve the profile to bind to (explicit or auto-derived)
+    const explicitProfile = toStringOrEmpty(body.profile);
+    const profileName = explicitProfile || sessionKeyToProfileName(sessionName);
+
+    // Verify the profile exists (or offer to create it)
+    const autoCreate = body.autoCreate === true;
+    const state = ctx.state();
+    const profileExists = profileName in state.resolved.profiles;
+
+    if (!profileExists) {
+      if (!autoCreate) {
+        return jsonError(
+          res,
+          404,
+          [
+            `Profile "${profileName}" does not exist.`,
+            `Set autoCreate:true to automatically create it, or create it first with POST /profiles/create.`,
+          ].join("\n"),
+        );
+      }
+      // Auto-create the profile so the agent can start using it immediately
+      try {
+        const service = createBrowserProfilesService(ctx);
+        await service.createProfile({ name: profileName });
+      } catch (err) {
+        const msg = String(err);
+        if (!msg.includes("already exists")) {
+          return jsonError(res, 500, `Failed to auto-create profile: ${msg}`);
+        }
+      }
+    }
+
+    await setSessionProfile(sessionName, profileName);
+    res.json({
+      ok: true,
+      sessionName,
+      profile: profileName,
+      autoCreated: !profileExists && autoCreate,
+    });
+  });
+
+  // DELETE /profiles/session-bind — remove a session → profile binding
+  app.delete("/profiles/session-bind", async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const sessionName = toStringOrEmpty(body.sessionName);
+    if (!sessionName) {
+      return jsonError(res, 400, "sessionName is required");
+    }
+    await removeSessionProfile(sessionName);
+    res.json({ ok: true, sessionName });
   });
 }

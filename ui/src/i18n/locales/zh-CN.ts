@@ -444,6 +444,14 @@ export const zh_CN: TranslationMap = {
       quiet: "龙虾帝国目前很安静。",
       runComplex: "运行复杂的任务以查看龙虾工人的运作。",
       waiting: "等待指令"
+    },
+    browserPreview: {
+      title: "🌐 浏览器实时预览",
+      refresh: "刷新截图",
+      noConnection: "无浏览器连接",
+      collapse: "折叠预览",
+      expand: "展开预览",
+      lastUpdated: "更新于 {time}",
     }
   }
 };

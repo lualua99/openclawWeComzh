@@ -451,6 +451,14 @@ export const en: TranslationMap = {
       quiet: "The Lobster Empire is currently quiet.",
       runComplex: "Run a complex task to see the lobster workers in action.",
       waiting: "Waiting for instructions"
+    },
+    browserPreview: {
+      title: "🌐 Browser Live Preview",
+      refresh: "Refresh screenshot",
+      noConnection: "No browser connection",
+      collapse: "Collapse preview",
+      expand: "Expand preview",
+      lastUpdated: "Updated {time}",
     }
   }
 };

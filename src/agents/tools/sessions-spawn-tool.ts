@@ -26,6 +26,18 @@ const SessionsSpawnToolSchema = Type.Object({
   sandbox: optionalStringEnum(SESSIONS_SPAWN_SANDBOX_MODES),
   tools: Type.Optional(Type.Array(Type.String(), { description: "Optional explicit list of tools to use, replacing the default policy." })),
   skills: Type.Optional(Type.Array(Type.String(), { description: "Optional explicit list of skills to load, replacing the default policy." })),
+  /**
+   * Whether to wait for the subagent to complete before returning.
+   *
+   * false (default): returns immediately with status="accepted"; the subagent
+   *   runs in the background and its result is delivered asynchronously.
+   *   Use this when spawning multiple subagents in parallel — call sessions_spawn
+   *   multiple times and they will all run concurrently.
+   *
+   * true: blocks until the subagent finishes and returns completionText inline.
+   *   Only use this when you need the result before proceeding (single sequential task).
+   */
+  wait: Type.Optional(Type.Boolean()),
 });
 
 export function createSessionsSpawnTool(opts?: {
@@ -83,6 +95,10 @@ export function createSessionsSpawnTool(opts?: {
           ? Math.max(0, Math.floor(timeoutSecondsCandidate))
           : undefined;
       const thread = params.thread === true;
+      // wait=false (default): fire & forget — the subagent runs in the background
+      // and delivers its result asynchronously. Use this to launch parallel subagents.
+      // wait=true: block until the subagent finishes and return completionText inline.
+      const wait = params.wait === true;
       const tools = Array.isArray(params.tools) && params.tools.every(t => typeof t === "string") ? params.tools : undefined;
       const skills = Array.isArray(params.skills) && params.skills.every(t => typeof t === "string") ? params.skills : undefined;
 
@@ -117,7 +133,7 @@ export function createSessionsSpawnTool(opts?: {
                 mode,
                 cleanup,
                 sandbox,
-                expectsCompletionMessage: true,
+                expectsCompletionMessage: wait,
                 tools,
                 skills,
               },

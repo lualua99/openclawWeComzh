@@ -1,5 +1,6 @@
 import type { PwAiModule } from "../pw-ai-module.js";
 import { getPwAiModule as getPwAiModuleBase } from "../pw-ai-module.js";
+import { withTargetLock } from "../pw-target-queue.js";
 import type { BrowserRouteContext, ProfileContext } from "../server-context.js";
 import type { BrowserRequest, BrowserResponse } from "./types.js";
 import { getProfileContext, jsonError } from "./utils.js";
@@ -104,11 +105,16 @@ export async function withRouteTabContext<T>(
   }
   try {
     const tab = await profileCtx.ensureTabAvailable(params.targetId);
-    return await params.run({
-      profileCtx,
-      tab,
-      cdpUrl: profileCtx.profile.cdpUrl,
-    });
+    const cdpUrl = profileCtx.profile.cdpUrl;
+    // Serialize all Playwright operations for this (profile, target) pair.
+    // Prevents interleaved actions when multiple agent sessions share a tab.
+    return await withTargetLock(cdpUrl, tab.targetId, () =>
+      params.run({
+        profileCtx,
+        tab,
+        cdpUrl,
+      }),
+    );
   } catch (err) {
     handleRouteError(params.ctx, params.res, err);
     return undefined;

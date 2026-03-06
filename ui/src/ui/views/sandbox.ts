@@ -2044,7 +2044,7 @@ export function renderSandbox(props: SandboxProps) {
       }
       .sandbox-wrap .timeline__dot {
         width: 11px;
-        height: 11px;
+        height: 11px;沙盘不能完美的实时监视，执行任务的情况，还有一个问题就是并行处理的问题，其他问题都这里自己解决的差不多了，
         border-radius: 50%;
         margin-top: 4px;
         z-index: 1;

@@ -199,6 +199,168 @@ function renderTodosCard(card: ToolCard) {
   return nothing;
 }
 
+// ─── Browser Tool Card ───────────────────────────────────────────────────────
+// Renders inline screenshots and snapshot summaries for browser tool calls.
+// Mirrors agent-browser's "pair browsing" concept: makes browser activity
+// visible in the chat stream without needing a separate preview window.
+function renderBrowserCard(card: ToolCard) {
+  const args = (card.args ?? {}) as Record<string, unknown>;
+  const action =
+    typeof args.action === "string" ? args.action.trim() : "";
+
+  // ── Call: screenshot in progress
+  if (card.kind === "call" && action === "screenshot") {
+    const targetUrl = (args.targetUrl ?? args.targetId ?? "") as string;
+    return html`
+      <div class="chat-tool-card chat-browser-card chat-browser-card--capturing">
+        <div class="chat-tool-card__header">
+          <div class="chat-tool-card__title">
+            <span class="chat-browser-card__icon">📸</span>
+            <span>Capturing Screenshot</span>
+          </div>
+          <span class="chat-spawn-pulse"></span>
+        </div>
+        ${targetUrl ? html`<div class="chat-tool-card__detail">${targetUrl}</div>` : nothing}
+      </div>
+    `;
+  }
+
+  // ── Call: navigate in progress
+  if (card.kind === "call" && action === "navigate") {
+    const url = (args.url ?? args.targetUrl ?? "") as string;
+    return html`
+      <div class="chat-tool-card chat-browser-card">
+        <div class="chat-tool-card__header">
+          <div class="chat-tool-card__title">
+            <span class="chat-browser-card__icon">🌐</span>
+            <span>Navigating</span>
+          </div>
+          <span class="chat-spawn-pulse"></span>
+        </div>
+        ${url ? html`<div class="chat-tool-card__detail mono" style="font-size:0.75rem;word-break:break-all;">${url}</div>` : nothing}
+      </div>
+    `;
+  }
+
+  // ── Call: snapshot in progress
+  if (card.kind === "call" && action === "snapshot") {
+    return html`
+      <div class="chat-tool-card chat-browser-card">
+        <div class="chat-tool-card__header">
+          <div class="chat-tool-card__title">
+            <span class="chat-browser-card__icon">🔍</span>
+            <span>Reading Page</span>
+          </div>
+          <span class="chat-spawn-pulse"></span>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Result: parse JSON results
+  if (card.kind === "result" && card.text) {
+    let parsed: Record<string, unknown> | null = null;
+    try {
+      parsed = JSON.parse(card.text) as Record<string, unknown>;
+    } catch {
+      // not JSON — fall through to default rendering
+    }
+
+    if (parsed) {
+      // Screenshot result: { ok, path, targetId, url }
+      const filePath = typeof parsed.path === "string" ? parsed.path : null;
+      if (filePath && parsed.ok) {
+        // Convert absolute path to gateway-served media URL.
+        // Gateway serves /media/* from the ~/.openclaw/media directory.
+        const fileName = filePath.split("/").pop() ?? "";
+        const imgSrc = fileName
+          ? `/media/browser/${fileName}`
+          : null;
+        const pageUrl = typeof parsed.url === "string" ? parsed.url : "";
+        return html`
+          <div class="chat-tool-card chat-browser-card chat-browser-card--screenshot">
+            <div class="chat-tool-card__header">
+              <div class="chat-tool-card__title">
+                <span class="chat-browser-card__icon">🖼️</span>
+                <span>Browser Screenshot</span>
+              </div>
+              ${pageUrl
+                ? html`<span class="chat-tool-card__detail" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.7rem;opacity:0.5;">${pageUrl}</span>`
+                : nothing}
+            </div>
+            ${imgSrc
+              ? html`
+                <a href=${imgSrc} target="_blank" rel="noopener" style="display:block;">
+                  <img
+                    src=${imgSrc}
+                    alt="Browser screenshot"
+                    style="
+                      width: 100%;
+                      border-radius: 0 0 8px 8px;
+                      display: block;
+                      cursor: zoom-in;
+                      max-height: 320px;
+                      object-fit: contain;
+                      background: rgba(0,0,0,0.2);
+                    "
+                    @error=${
+                      (e: Event) => {
+                        const img = e.target as HTMLImageElement;
+                        img.style.display = "none";
+                      }
+                    }
+                  />
+                </a>
+              `
+              : html`<div class="chat-tool-card__preview mono" style="font-size:0.7rem;opacity:0.6;">${filePath}</div>`}
+          </div>
+        `;
+      }
+
+      // Snapshot result: { ok, format, snapshot, refs, stats }
+      const snapshotText = typeof parsed.snapshot === "string" ? parsed.snapshot : null;
+      if (snapshotText && parsed.ok) {
+        const stats = parsed.stats as Record<string, number> | undefined;
+        const refs = parsed.refs as Record<string, unknown> | undefined;
+        const refsCount = refs ? Object.keys(refs).length : (stats?.refs ?? 0);
+        const interactiveCount = stats?.interactive ?? refsCount;
+        const truncated = parsed.truncated === true;
+        const pageUrl = typeof parsed.url === "string" ? parsed.url : "";
+        // Show a compact, AI-readable summary with ref stats
+        const previewLines = snapshotText.split("\n").slice(0, 6).join("\n");
+        return html`
+          <div class="chat-tool-card chat-browser-card chat-browser-card--snapshot">
+            <div class="chat-tool-card__header">
+              <div class="chat-tool-card__title">
+                <span class="chat-browser-card__icon">📋</span>
+                <span>Page Snapshot</span>
+              </div>
+              <span style="font-size:0.7rem;opacity:0.5;">
+                ${interactiveCount} refs
+                ${truncated ? "· truncated" : ""}
+              </span>
+            </div>
+            ${pageUrl
+              ? html`<div class="chat-tool-card__detail" style="font-size:0.72rem;opacity:0.55;word-break:break-all;">${pageUrl}</div>`
+              : nothing}
+            <div class="chat-tool-card__preview mono" style="
+              max-height: 100px;
+              overflow: hidden;
+              font-size: 0.7rem;
+              white-space: pre;
+              opacity: 0.7;
+              mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+              -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+            ">${previewLines}</div>
+          </div>
+        `;
+      }
+    }
+  }
+
+  return nothing;
+}
+
 // ─── Subagent Delegation Card ─────────────────────────────────────────────────
 function renderSpawnCard(card: ToolCard) {
   if (card.kind === "call") {
@@ -286,6 +448,14 @@ export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: 
   const showCollapsed = hasText && !isShort;
   const showInline = hasText && isShort;
   const isEmpty = !hasText;
+
+  // ── Custom: Browser Screenshot / Snapshot
+  if (card.name === "browser") {
+    const custom = renderBrowserCard(card);
+    if (custom !== nothing) {
+      return custom;
+    }
+  }
 
   // ── Custom: Task Planner
   if (card.name === "write_todos") {

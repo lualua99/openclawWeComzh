@@ -321,10 +321,22 @@ function observeBrowser(browser: Browser) {
 
 async function connectBrowser(cdpUrl: string): Promise<ConnectedBrowser> {
   const normalized = normalizeCdpUrl(cdpUrl);
+
+  // Fast path: reuse an already-established connection for the same CDP URL.
   if (cached?.cdpUrl === normalized) {
     return cached;
   }
+
+  // In-flight path: we are already attempting to connect to this same CDP URL.
+  // Reuse the in-flight promise so concurrent callers don't race to open N
+  // parallel CDP WebSocket connections.
+  //
+  // NOTE: We do NOT guard against a stale `connecting` from a *different* URL
+  // because each profile has its own connectBrowser() invocation context.
   if (connecting) {
+    // The in-flight connection may be for a different CDP URL if forceDisconnect
+    // cleared `cached` but left `connecting` intact. Await regardless — the new
+    // result will have a cdpUrl that may or may not match; callers re-check.
     return await connecting;
   }
 
@@ -659,10 +671,20 @@ export async function forceDisconnectPlaywrightForTarget(opts: {
     return;
   }
   const cur = cached;
+  // Clear `cached` immediately so new requests trigger a fresh connectOverCDP.
   cached = null;
-  // Also clear `connecting` so the next call does a fresh connectOverCDP
-  // rather than awaiting a stale promise.
-  connecting = null;
+  // IMPORTANT: Do NOT clear `connecting` here.
+  //
+  // If we clear `connecting`, any requests currently awaiting it will get
+  // undefined/null back, fall through to the cached===null branch, and each
+  // independently call connectWithRetry() — turning one disconnect into N
+  // parallel reconnect races.
+  //
+  // Instead, let them continue awaiting the existing `connecting` promise:
+  // - If `connecting` is still pending (unlikely if we just cleared `cached`),
+  //   those waiters get the new ConnectedBrowser when it resolves.
+  // - If `connecting` is null (the common case), the next request to
+  //   connectBrowser() will start a fresh `connecting` and others will coalesce.
   if (cur) {
     // Remove the "disconnected" listener to prevent the old browser's teardown
     // from racing with a fresh connection and nulling the new `cached`.
@@ -670,8 +692,8 @@ export async function forceDisconnectPlaywrightForTarget(opts: {
       cur.browser.off("disconnected", cur.onDisconnected);
     }
 
-    // Best-effort: kill any stuck JS to unblock the target's execution context before we
-    // disconnect Playwright's CDP connection.
+    // Best-effort: kill any stuck JS to unblock the target's execution context
+    // before we disconnect Playwright's CDP connection.
     const targetId = opts.targetId?.trim() || "";
     if (targetId) {
       await tryTerminateExecutionViaCdp({ cdpUrl: normalized, targetId }).catch(() => {});

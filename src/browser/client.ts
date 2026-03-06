@@ -335,3 +335,46 @@ export async function browserSnapshot(
 }
 
 // Actions beyond the basic read-only commands live in client-actions.ts.
+
+/**
+ * Snapshot shortcut: returns only interactive elements with refs (@e1, @e2, ...).
+ * Mirrors agent-browser's `snapshot -i` workflow — ideal for AI tool calls
+ * where the agent only needs clickable/fillable elements.
+ */
+export async function browserSnapshotInteractive(
+  baseUrl: string | undefined,
+  opts: {
+    targetId?: string;
+    profile?: string;
+    maxChars?: number;
+  } = {},
+): Promise<SnapshotResult> {
+  return browserSnapshot(baseUrl, {
+    format: "ai",
+    interactive: true,
+    compact: true,
+    targetId: opts.targetId,
+    profile: opts.profile,
+    ...(typeof opts.maxChars === "number" ? { maxChars: opts.maxChars } : {}),
+  });
+}
+
+/**
+ * Snapshot shortcut: efficient mode — compact interactive snapshot with depth limit.
+ * Mirrors agent-browser's `snapshot -i --json` + optimal AI workflow.
+ * Minimizes token usage while preserving all actionable refs.
+ */
+export async function browserSnapshotEfficient(
+  baseUrl: string | undefined,
+  opts: {
+    targetId?: string;
+    profile?: string;
+  } = {},
+): Promise<SnapshotResult> {
+  return browserSnapshot(baseUrl, {
+    format: "ai",
+    mode: "efficient",
+    targetId: opts.targetId,
+    profile: opts.profile,
+  });
+}

@@ -257,3 +257,89 @@ export async function browserScreenshotAction(
     timeoutMs: 20000,
   });
 }
+
+// ─── Batch Actions ───────────────────────────────────────────────────────────
+// Mirrors agent-browser's `&&` command chaining design:
+//   agent-browser open url && agent-browser wait --load networkidle && agent-browser snapshot -i
+// Submit a sequence of steps in a single request to minimize round-trips.
+
+/**
+ * A single step in a batch request. Supports act steps (click, type, wait, etc.),
+ * navigate steps, and snapshot steps. Executed in order; stops on first error.
+ */
+export type BrowserBatchStep =
+  | (BrowserActRequest & { kind: BrowserActRequest["kind"] })
+  | {
+      kind: "navigate";
+      url: string;
+      targetId?: string;
+      timeoutMs?: number;
+    }
+  | {
+      kind: "snapshot";
+      targetId?: string;
+      /** Use 'efficient' to return only interactive refs — mirrors agent-browser -i flag */
+      mode?: "efficient";
+      interactive?: boolean;
+      compact?: boolean;
+      depth?: number;
+    };
+
+export type BrowserBatchRequest = {
+  steps: BrowserBatchStep[];
+  targetId?: string;
+  profile?: string;
+  /**
+   * If true, stop processing steps after the first snapshot step succeeds.
+   * Useful for navigate → wait → snapshot patterns where you only need the final snapshot.
+   */
+  stopOnSnapshot?: boolean;
+};
+
+export type BrowserBatchStepResult =
+  | { ok: true; kind: string; result?: unknown }
+  | { ok: false; kind: string; error: string };
+
+export type BrowserBatchResponse = {
+  ok: true;
+  targetId: string;
+  url?: string;
+  results: BrowserBatchStepResult[];
+  /**
+   * The last successful snapshot result promoted to top-level for easy AI access.
+   * AI agents can read this directly without scanning results[].
+   * Present only when a snapshot step succeeded.
+   */
+  snapshot?: unknown;
+  /** Index of the step that failed, if any */
+  failedAt?: number;
+};
+
+/**
+ * Execute a batch of browser steps in sequence.
+ * Mirrors agent-browser's `&&` command chaining — submit navigate + wait + snapshot
+ * in a single call to minimize LLM round-trips and token overhead.
+ *
+ * @example
+ * await browserBatch(baseUrl, {
+ *   steps: [
+ *     { kind: "navigate", url: "https://example.com" },
+ *     { kind: "wait", loadState: "networkidle" },
+ *     { kind: "snapshot", mode: "efficient" },
+ *   ],
+ *   stopOnSnapshot: true,
+ * });
+ */
+export async function browserBatch(
+  baseUrl: string | undefined,
+  req: BrowserBatchRequest,
+  opts?: { profile?: string },
+): Promise<BrowserBatchResponse> {
+  const q = buildProfileQuery(opts?.profile ?? req.profile);
+  return await fetchBrowserJson<BrowserBatchResponse>(withBaseUrl(baseUrl, `/batch${q}`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+    timeoutMs: 120000,
+  });
+}

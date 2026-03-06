@@ -69,6 +69,7 @@ async function executeSpawnAndExpectAccepted(params: {
   const result = await params.tool.execute(params.callId, {
     task: "do thing",
     runTimeoutSeconds: RUN_TIMEOUT_SECONDS,
+    wait: true,
     ...(params.cleanup ? { cleanup: params.cleanup } : {}),
     ...(params.label ? { label: params.label } : {}),
   });
