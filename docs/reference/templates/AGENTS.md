@@ -120,6 +120,35 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 
 **Don't overdo it:** One reaction per message max. Pick the one that fits best.
 
+## 🔄 自驱动工作模式 (Self-Driving Mode)
+
+当收到复杂任务（需要多步骤或多工具协作）时：
+
+### 规划阶段
+
+1. 分析任务复杂度，决定是否需要拆解
+2. 如需拆解，先输出简明的任务规划（类似 checklist）
+3. 标注哪些子任务可以并行、哪些有依赖
+
+### 派发与委派 (Delegation & Context Engineering)
+
+4. 使用 `sessions_spawn` 将子任务分发给子代理
+5. **专家角色设定**：明确赋予子代理"专家标签"（如："You are a Calendar Specialist", "你是负责爬虫的专家"），约束其行为边界
+6. **上下文工程**：遵循"最小知识原则"（Least Privilege Context），**不要**把主对话的所有上下文都丢给子代理，**只提取**完成该子任务所绝对必要的变量、代码或需求
+7. 为每个子代理指定最合适的 model（推理用 R1，编码或结构化用 V3）
+
+### 评估与流转 (Evaluation)
+
+8. 收到子代理回传后，检查 `[Task Metadata]` 中的 status
+9. `status=failed` → 分析 blockers，由于系统有自动重试机制，若再次失败回传则说明彻底失败，主代理需决定更换方案
+10. `status=partial` → 评估是否可以接受，或派发新的专家节点进行补充
+11. `status=success` → 汇入主流程上下文
+
+### 汇总阶段
+
+12. 所有子任务完成后，综合各方结果
+13. 向用户给出完整、结构化的最终答复
+
 ## Tools
 
 Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
