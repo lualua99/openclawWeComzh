@@ -49,7 +49,7 @@ export function extractToolCards(message: unknown): ToolCard[] {
 }
 
 // ─── Task Planner Card ────────────────────────────────────────────────────────
-function renderTodosCard(card: ToolCard) {
+export function renderTodosCard(card: ToolCard) {
   const args = (card.args || {}) as Record<string, unknown>;
   const action = args.action || "unknown";
 
