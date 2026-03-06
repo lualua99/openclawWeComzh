@@ -118,7 +118,7 @@ function renderTodosCard(card: ToolCard) {
           args.title || args.taskId
             ? html`<div class="chat-plan-todo-item ${isDone ? "chat-plan-todo-item--done" : isActive ? "chat-plan-todo-item--active" : "chat-plan-todo-item--pending"}">
               <span class="chat-plan-todo-icon">${isDone ? "✅" : isActive ? "🔄" : "⏳"}</span>
-              <span>${args.title || `Task #${String(args.taskId)}`}</span>
+              <span>${args.title || `Task #${String(args.taskId !== undefined && args.taskId !== null ? JSON.stringify(args.taskId) : "unknown")}`}</span>
             </div>`
             : nothing
         }
@@ -431,9 +431,9 @@ export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: 
   const hasText = Boolean(card.text?.trim());
 
   const canClick = Boolean(onOpenSidebar);
-  const handleClick = canClick
+  const handleClick = canClick && onOpenSidebar
     ? () => {
-        if (hasText) {
+        if (hasText && card.text) {
           onOpenSidebar(formatToolOutputForSidebar(card.text));
           return;
         }
@@ -512,7 +512,7 @@ export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: 
           : nothing
       }
       ${
-        showCollapsed
+        showCollapsed && card.text
           ? html`<div class="chat-tool-card__preview mono">${getTruncatedPreview(card.text)}</div>`
           : nothing
       }

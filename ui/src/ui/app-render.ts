@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { t, i18n } from "../i18n/index.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
@@ -169,7 +170,7 @@ export function renderApp(state: AppViewState) {
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const configValue =
-    state.configForm ?? (state.configSnapshot?.config);
+    state.configForm ?? state.configSnapshot?.config ?? null;
   const basePath = normalizeBasePath(state.basePath ?? "");
   const resolvedAgentId =
     state.agentsSelectedId ??
@@ -318,7 +319,7 @@ export function renderApp(state: AppViewState) {
               @locale-change=${(e: CustomEvent) => {
                 const loc = e.detail.locale;
                 state.applySettings({ ...state.settings, locale: loc });
-                i18n.setLocale(loc);
+                void i18n.setLocale(loc);
               }}
             ></language-switcher>
             <div class="pill">
@@ -485,7 +486,7 @@ export function renderApp(state: AppViewState) {
                   await loadSandboxTaskPlan(state);
                 },
                 onForceRestart: () => {
-                  state.handleSendChat("/new", { restoreDraft: true });
+                  void state.handleSendChat("/new", { restoreDraft: true });
                 },
               })
             : nothing
@@ -1043,7 +1044,7 @@ export function renderApp(state: AppViewState) {
                 devicesList: state.devicesList,
                 configForm:
                   state.configForm ??
-                  (state.configSnapshot?.config),
+                  state.configSnapshot?.config ?? null,
                 configLoading: state.configLoading,
                 configSaving: state.configSaving,
                 configDirty: state.configFormDirty,
@@ -1198,7 +1199,7 @@ export function renderApp(state: AppViewState) {
                 onToggleWebSearch: (enabled: boolean) => state.handleToggleWebSearch(enabled),
                 onApprovePlan: () => {
                   state.chatMessage = "已批准计划，请开始执行";
-                  state.handleSendChat();
+                  void state.handleSendChat();
                 },
                 sandboxChatEvents: state.sandboxChatEvents,
                 sandboxSessions: state.sessionsResult?.sessions?.filter(

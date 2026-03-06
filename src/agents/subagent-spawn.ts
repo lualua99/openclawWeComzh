@@ -48,6 +48,7 @@ export type SpawnSubagentParams = {
   expectsCompletionMessage?: boolean;
   tools?: string[];
   skills?: string[];
+  sharedContext?: Record<string, unknown>;
 };
 
 export type SpawnSubagentContext = {
@@ -432,6 +433,9 @@ export async function spawnSubagentDirect(
     `[Subagent Context] You are running as a subagent (depth ${childDepth}/${maxSpawnDepth}). Results auto-announce to your requester; do not busy-poll for status.`,
     spawnMode === "session"
       ? "[Subagent Context] This subagent session is persistent and remains available for thread follow-up messages."
+      : undefined,
+    params.sharedContext
+      ? `[Shared Context] The following context/memory was passed from your requester:\n\`\`\`json\n${JSON.stringify(params.sharedContext, null, 2)}\n\`\`\`\nIf you modify this shared state during your task, you MUST return the final updated JSON wrapped in a \`<updated_shared_context>\` XML block at the very end of your final response.`
       : undefined,
     `[Subagent Task]: ${task}`,
   ]

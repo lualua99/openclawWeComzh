@@ -38,6 +38,7 @@ const SessionsSpawnToolSchema = Type.Object({
    *   Only use this when you need the result before proceeding (single sequential task).
    */
   wait: Type.Optional(Type.Boolean()),
+  sharedContext: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: "Optional JSON context to share state with the subagent, functioning as its initial memory." })),
 });
 
 export function createSessionsSpawnTool(opts?: {
@@ -101,6 +102,7 @@ export function createSessionsSpawnTool(opts?: {
       const wait = params.wait === true;
       const tools = Array.isArray(params.tools) && params.tools.every(t => typeof t === "string") ? params.tools : undefined;
       const skills = Array.isArray(params.skills) && params.skills.every(t => typeof t === "string") ? params.skills : undefined;
+      const sharedContext = params.sharedContext && typeof params.sharedContext === "object" ? (params.sharedContext as Record<string, unknown>) : undefined;
 
       const result =
         runtime === "acp"
@@ -136,6 +138,7 @@ export function createSessionsSpawnTool(opts?: {
                 expectsCompletionMessage: wait,
                 tools,
                 skills,
+                sharedContext,
               },
               {
                 agentSessionKey: opts?.agentSessionKey,

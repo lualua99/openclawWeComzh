@@ -1,3 +1,4 @@
+/* oxlint-disable typescript-eslint/no-unnecessary-boolean-literal-compare */
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { AssistantIdentity } from "../assistant-identity.ts";
@@ -268,7 +269,7 @@ function renderGroupedMessage(
 
   return html`
     <div class="${bubbleClasses}">
-      ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown) : nothing}
+      ${canCopyMarkdown && markdown ? renderCopyAsMarkdownButton(markdown) : nothing}
       ${renderMessageImages(images)}
       ${
         extractedThinking && opts.showReasoning

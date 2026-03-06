@@ -1,8 +1,9 @@
+/* oxlint-disable typescript-eslint/no-unnecessary-boolean-literal-compare */
 import { LitElement, html, css, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property } from "lit/decorators.js";
 import { icons } from "../icons.ts";
 import type { ChatProps } from "./chat.ts";
-import type { TaskPlanSnapshot } from "./sandbox.ts";
+
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
 import "../components/chat-input-area.ts";
 import "../components/resizable-divider.ts";
@@ -996,7 +997,7 @@ export class ChatLayout extends LitElement {
                 ? renderMarkdownSidebar({
                     content: this.props.sidebarContent ?? null,
                     error: this.props.sidebarError ?? null,
-                    onClose: this.props.onCloseSidebar,
+                    onClose: this.props.onCloseSidebar ?? (() => {}),
                     onViewRawText: () => {
                       if (!this.props.sidebarContent || !this.props.onOpenSidebar) {return;}
                       this.props.onOpenSidebar(`\`\`\`\n${this.props.sidebarContent}\n\`\`\``);

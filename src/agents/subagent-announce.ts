@@ -1241,7 +1241,20 @@ export async function runSubagentAnnounceFlow(params: {
     const taskLabel = params.label || params.task || "task";
     const subagentName = resolveAgentIdFromSessionKey(params.childSessionKey);
     const announceSessionId = childSessionId || "unknown";
-    const findings = reply || "(no output)";
+    let findings = reply || "(no output)";
+    let updatedSharedContextRaw = "";
+    
+    // Extract the <updated_shared_context> payload if the subagent modified the context
+    const contextRegex = /<updated_shared_context>\s*([\s\S]*?)\s*<\/updated_shared_context>/i;
+    const contextMatch = findings.match(contextRegex);
+    if (contextMatch && contextMatch[1]) {
+      updatedSharedContextRaw = contextMatch[1].trim();
+      findings = findings.replace(contextRegex, "").trim();
+      if (!findings) {
+        findings = "(no text output)";
+      }
+    }
+
     let completionMessage = "";
     let triggerMessage = "";
     let steerMessage = "";
@@ -1314,6 +1327,13 @@ export async function runSubagentAnnounceFlow(params: {
       outcome,
       announceType,
     });
+    
+    // Append the updated context nicely formatted
+    if (updatedSharedContextRaw) {
+      const contextStr = `\n\n[Updated Shared Context]:\n\`\`\`json\n${updatedSharedContextRaw}\n\`\`\``;
+      completionMessage += contextStr;
+      findings += contextStr;
+    }
     internalEvents = [
       {
         type: "task_completion",

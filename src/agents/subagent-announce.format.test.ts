@@ -1968,4 +1968,44 @@ describe("subagent announce formatting", () => {
       expect(call?.params?.channel, testCase.name).toBe(testCase.expectedChannel);
     }
   });
+
+  describe("Shared Context Extraction", () => {
+    it("extracts <updated_shared_context> from findings and appends it to completionMessage", async () => {
+      const runId = "run-shared-context";
+      sessionStore = {
+        "agent:main:subagent:child": {
+          sessionId: "context-session",
+          inputTokens: 10,
+          outputTokens: 5,
+        },
+      };
+
+      const findingsText = "Finished the task successfully.";
+      const sharedContextJson = `{\n  "memory_var": "updated_value"\n}`;
+      const rawReply = `${findingsText}\n\n<updated_shared_context>\n${sharedContextJson}\n</updated_shared_context>`;
+      readLatestAssistantReplyMock.mockResolvedValueOnce(rawReply);
+
+      const didAnnounce = await runSubagentAnnounceFlow({
+        childSessionKey: "agent:main:subagent:child",
+        childRunId: runId,
+        requesterSessionKey: "agent:main:main",
+        requesterDisplayKey: "main",
+        ...defaultOutcomeAnnounce,
+        task: "Update context",
+      });
+
+      expect(didAnnounce).toBe(true);
+
+      const call = agentSpy.mock.calls[0]?.[0] as { params?: { message?: string; internalEvents?: Array<{ result?: string }> } };
+      const internalEvents = call?.params?.internalEvents;
+      expect(internalEvents, "should have internal events").toBeDefined();
+      expect(internalEvents?.[0]?.result).toContain(findingsText);
+      expect(internalEvents?.[0]?.result).toContain(sharedContextJson);
+
+      const announcementText = call?.params?.message;
+      expect(announcementText).toContain(findingsText);
+      expect(announcementText).toContain("[Updated Shared Context]:\n```json\n" + sharedContextJson + "\n```");
+      expect(announcementText).not.toContain("<updated_shared_context>");
+    });
+  });
 });

@@ -368,7 +368,7 @@ export function registerBrowserAgentActRoutes(
               break;
             }
             const pw = await requirePwAi(res, "batch:navigate");
-            if (!pw) return;
+            if (!pw) {return;}
             const navResult = await pw.navigateViaPlaywright({
               cdpUrl,
               targetId: tab.targetId,
@@ -425,7 +425,7 @@ export function registerBrowserAgentActRoutes(
           // ── act (click / type / wait / press / etc.) ──
           if (isActKind(kind)) {
             const pw = await requirePwAi(res, `batch:${kind}`);
-            if (!pw) return;
+            if (!pw) {return;}
             const evaluateEnabled = ctx.state().resolved.evaluateEnabled;
 
             if (kind === "evaluate" && !evaluateEnabled) {
@@ -526,7 +526,7 @@ export function registerBrowserAgentActRoutes(
               }
             }
 
-            if (failedAt !== undefined) break;
+            if (failedAt !== undefined) {break;}
             results.push({ ok: true, kind });
             continue;
           }
@@ -544,7 +544,7 @@ export function registerBrowserAgentActRoutes(
       // Promote the last successful snapshot result to the top-level for easier AI consumption.
       // AI agents can read `response.snapshot` directly without iterating results[].
       const lastSnapshotResult = [...results]
-        .reverse()
+        .toReversed()
         .find((r) => r.ok && r.kind === "snapshot");
       const topLevelSnapshot =
         lastSnapshotResult && "result" in lastSnapshotResult ? lastSnapshotResult.result : undefined;
