@@ -314,6 +314,7 @@ export async function handleToolExecutionEnd(
   ctx.state.toolSummaryById.delete(toolCallId);
   if (isToolError) {
     ctx.state.consecutiveToolErrors += 1;
+    ctx.state.chaosScore += 2; // Errors increase chaosScore more aggressively
     const errorMessage = extractToolErrorMessage(sanitizedResult);
     ctx.state.lastToolError = {
       toolName,
@@ -324,117 +325,130 @@ export async function handleToolExecutionEnd(
     };
   } else {
     ctx.state.consecutiveToolErrors = 0;
+    // Repetition detection for chaosScore
+    const currentFingerprint = callSummary?.actionFingerprint || `${toolName}:${meta || ""}`;
+    if (ctx.state.lastActionFingerprint === currentFingerprint) {
+      ctx.state.chaosScore += 1;
+    } else {
+      ctx.state.chaosScore = Math.max(0, ctx.state.chaosScore - 0.5);
+    }
+    ctx.state.lastActionFingerprint = currentFingerprint;
+
     if (ctx.state.lastToolError) {
-    // Keep unresolved mutating failures until the same action succeeds.
-    if (ctx.state.lastToolError.mutatingAction) {
-      if (
-        isSameToolMutationAction(ctx.state.lastToolError, {
-          toolName,
-          meta,
-          actionFingerprint: callSummary?.actionFingerprint,
-        })
-      ) {
+      // Keep unresolved mutating failures until the same action succeeds.
+      if (ctx.state.lastToolError.mutatingAction) {
+        if (
+          isSameToolMutationAction(ctx.state.lastToolError, {
+            toolName,
+            meta,
+            actionFingerprint: callSummary?.actionFingerprint,
+          })
+        ) {
+          ctx.state.lastToolError = undefined;
+        }
+      } else {
         ctx.state.lastToolError = undefined;
       }
-    } else {
-      ctx.state.lastToolError = undefined;
     }
-  }
 
-  // Commit messaging tool text on success, discard on error.
-  const pendingText = ctx.state.pendingMessagingTexts.get(toolCallId);
-  const pendingTarget = ctx.state.pendingMessagingTargets.get(toolCallId);
-  if (pendingText) {
-    ctx.state.pendingMessagingTexts.delete(toolCallId);
-    if (!isToolError) {
-      ctx.state.messagingToolSentTexts.push(pendingText);
-      ctx.state.messagingToolSentTextsNormalized.push(normalizeTextForComparison(pendingText));
-      ctx.log.debug(`Committed messaging text: tool=${toolName} len=${pendingText.length}`);
-      ctx.trimMessagingToolSent();
+    // Commit messaging tool text on success, discard on error.
+    const pendingText = ctx.state.pendingMessagingTexts.get(toolCallId);
+    const pendingTarget = ctx.state.pendingMessagingTargets.get(toolCallId);
+    if (pendingText) {
+      ctx.state.pendingMessagingTexts.delete(toolCallId);
+      if (!isToolError) {
+        ctx.state.messagingToolSentTexts.push(pendingText);
+        ctx.state.messagingToolSentTextsNormalized.push(normalizeTextForComparison(pendingText));
+        ctx.log.debug(`Committed messaging text: tool=${toolName} len=${pendingText.length}`);
+        ctx.trimMessagingToolSent();
+      }
     }
-  }
-  if (pendingTarget) {
-    ctx.state.pendingMessagingTargets.delete(toolCallId);
-    if (!isToolError) {
-      ctx.state.messagingToolSentTargets.push(pendingTarget);
-      ctx.trimMessagingToolSent();
+    if (pendingTarget) {
+      ctx.state.pendingMessagingTargets.delete(toolCallId);
+      if (!isToolError) {
+        ctx.state.messagingToolSentTargets.push(pendingTarget);
+        ctx.trimMessagingToolSent();
+      }
     }
-  }
-  const pendingMediaUrls = ctx.state.pendingMessagingMediaUrls.get(toolCallId) ?? [];
-  ctx.state.pendingMessagingMediaUrls.delete(toolCallId);
-  const startArgs =
-    startData?.args && typeof startData.args === "object"
-      ? (startData.args as Record<string, unknown>)
-      : {};
-  const isMessagingSend =
-    pendingMediaUrls.length > 0 ||
-    (isMessagingTool(toolName) && isMessagingToolSendAction(toolName, startArgs));
-  if (!isToolError && isMessagingSend) {
-    const committedMediaUrls = [
-      ...pendingMediaUrls,
-      ...collectMessagingMediaUrlsFromToolResult(result),
-    ];
-    if (committedMediaUrls.length > 0) {
-      ctx.state.messagingToolSentMediaUrls.push(...committedMediaUrls);
-      ctx.trimMessagingToolSent();
+    const pendingMediaUrls = ctx.state.pendingMessagingMediaUrls.get(toolCallId) ?? [];
+    ctx.state.pendingMessagingMediaUrls.delete(toolCallId);
+    const startArgs =
+      startData?.args && typeof startData.args === "object"
+        ? (startData.args as Record<string, unknown>)
+        : {};
+    const isMessagingSend =
+      pendingMediaUrls.length > 0 ||
+      (isMessagingTool(toolName) && isMessagingToolSendAction(toolName, startArgs));
+    if (!isToolError && isMessagingSend) {
+      const committedMediaUrls = [
+        ...pendingMediaUrls,
+        ...collectMessagingMediaUrlsFromToolResult(result),
+      ];
+      if (committedMediaUrls.length > 0) {
+        ctx.state.messagingToolSentMediaUrls.push(...committedMediaUrls);
+        ctx.trimMessagingToolSent();
+      }
     }
-  }
 
-  // Track committed reminders only when cron.add completed successfully.
-  if (!isToolError && toolName === "cron" && isCronAddAction(startData?.args)) {
-    ctx.state.successfulCronAdds += 1;
-  }
+    // Track committed reminders only when cron.add completed successfully.
+    if (!isToolError && toolName === "cron" && isCronAddAction(startData?.args)) {
+      ctx.state.successfulCronAdds += 1;
+    }
 
-  emitAgentEvent({
-    runId: ctx.params.runId,
-    stream: "tool",
-    data: {
-      phase: "result",
-      name: toolName,
-      toolCallId,
-      meta,
-      isError: isToolError,
-      result: sanitizedResult,
-    },
-  });
-  void ctx.params.onAgentEvent?.({
-    stream: "tool",
-    data: {
-      phase: "result",
-      name: toolName,
-      toolCallId,
-      meta,
-      isError: isToolError,
-    },
-  });
+    emitAgentEvent({
+      runId: ctx.params.runId,
+      stream: "tool",
+      data: {
+        phase: "result",
+        name: toolName,
+        toolCallId,
+        meta,
+        isError: isToolError,
+        result: sanitizedResult,
+      },
+    });
+    void ctx.params.onAgentEvent?.({
+      stream: "tool",
+      data: {
+        phase: "result",
+        name: toolName,
+        toolCallId,
+        meta,
+        isError: isToolError,
+      },
+    });
 
-  ctx.log.debug(
-    `embedded run tool end: runId=${ctx.params.runId} tool=${toolName} toolCallId=${toolCallId}`,
-  );
+    ctx.log.debug(
+      `embedded run tool end: runId=${ctx.params.runId} tool=${toolName} toolCallId=${toolCallId}`,
+    );
 
-  emitToolResultOutput({ ctx, toolName, meta, isToolError, result, sanitizedResult });
+    emitToolResultOutput({ ctx, toolName, meta, isToolError, result, sanitizedResult });
 
-  // Run after_tool_call plugin hook (fire-and-forget)
-  const hookRunnerAfter = ctx.hookRunner ?? getGlobalHookRunner();
-  if (hookRunnerAfter?.hasHooks("after_tool_call")) {
-    const durationMs = startData?.startTime != null ? Date.now() - startData.startTime : undefined;
-    const toolArgs = startData?.args;
-    const hookEvent: PluginHookAfterToolCallEvent = {
-      toolName,
-      params: (toolArgs && typeof toolArgs === "object" ? toolArgs : {}) as Record<string, unknown>,
-      result: sanitizedResult,
-      error: isToolError ? extractToolErrorMessage(sanitizedResult) : undefined,
-      durationMs,
-    };
-    void hookRunnerAfter
-      .runAfterToolCall(hookEvent, {
+    // Run after_tool_call plugin hook (fire-and-forget)
+    const hookRunnerAfter = ctx.hookRunner ?? getGlobalHookRunner();
+    if (hookRunnerAfter?.hasHooks("after_tool_call")) {
+      const durationMs =
+        startData?.startTime != null ? Date.now() - startData.startTime : undefined;
+      const toolArgs = startData?.args;
+      const hookEvent: PluginHookAfterToolCallEvent = {
         toolName,
-        agentId: undefined,
-        sessionKey: undefined,
-      })
-      .catch((err) => {
-        ctx.log.warn(`after_tool_call hook failed: tool=${toolName} error=${String(err)}`);
-      });
+        params: (toolArgs && typeof toolArgs === "object" ? toolArgs : {}) as Record<
+          string,
+          unknown
+        >,
+        result: sanitizedResult,
+        error: isToolError ? extractToolErrorMessage(sanitizedResult) : undefined,
+        durationMs,
+      };
+      void hookRunnerAfter
+        .runAfterToolCall(hookEvent, {
+          toolName,
+          agentId: undefined,
+          sessionKey: undefined,
+        })
+        .catch((err) => {
+          ctx.log.warn(`after_tool_call hook failed: tool=${toolName} error=${String(err)}`);
+        });
+    }
   }
-}
 }

@@ -15,13 +15,13 @@ import { AGENT_LANE_SUBAGENT } from "./lanes.js";
 import { resolveSubagentSpawnModelSelection } from "./model-selection.js";
 import { resolveSandboxRuntimeStatus } from "./sandbox/runtime-status.js";
 import { buildSubagentSystemPrompt } from "./subagent-announce.js";
+import { readLatestSubagentOutput } from "./subagent-announce.js";
 import { getSubagentDepthFromSessionStore } from "./subagent-depth.js";
 import {
   countActiveRunsForSession,
   registerSubagentRun,
   waitForSubagentCompletion,
 } from "./subagent-registry.js";
-import { readLatestSubagentOutput } from "./subagent-announce.js";
 import { readStringParam } from "./tools/common.js";
 import {
   resolveDisplaySessionKey,
@@ -61,6 +61,8 @@ export type SpawnSubagentContext = {
   agentGroupChannel?: string | null;
   agentGroupSpace?: string | null;
   requesterAgentIdOverride?: string;
+  /** Multi-agent Cognitive Loop Fusion: current recursive iteration depth */
+  iterationDepth?: number;
 };
 
 export const SUBAGENT_SPAWN_ACCEPTED_NOTE =
@@ -419,6 +421,14 @@ export async function spawnSubagentDirect(
     }
     threadBindingReady = true;
   }
+
+  // Multi-agent Cognitive Loop Fusion: Increment iteration depth for sub-agent
+  const childIterationDepth = (ctx.iterationDepth ?? 0) + 1;
+  const sharedContext = {
+    ...params.sharedContext,
+    cognitiveDepth: childIterationDepth,
+  };
+
   const childSystemPrompt = buildSubagentSystemPrompt({
     requesterSessionKey,
     requesterOrigin,
@@ -430,12 +440,12 @@ export async function spawnSubagentDirect(
     maxSpawnDepth,
   });
   const childTaskMessage = [
-    `[Subagent Context] You are running as a subagent (depth ${childDepth}/${maxSpawnDepth}). Results auto-announce to your requester; do not busy-poll for status.`,
+    `[Subagent Context] You are running as a subagent (depth ${childDepth}/${maxSpawnDepth}, iteration ${childIterationDepth}). Results auto-announce to your requester; do not busy-poll for status.`,
     spawnMode === "session"
       ? "[Subagent Context] This subagent session is persistent and remains available for thread follow-up messages."
       : undefined,
-    params.sharedContext
-      ? `[Shared Context] The following context/memory was passed from your requester:\n\`\`\`json\n${JSON.stringify(params.sharedContext, null, 2)}\n\`\`\`\nIf you modify this shared state during your task, you MUST return the final updated JSON wrapped in a \`<updated_shared_context>\` XML block at the very end of your final response.`
+    sharedContext
+      ? `[Shared Context] The following context/memory was passed from your requester (Cognitive Iteration Formula: Z ⇌ Z² + C):\n\`\`\`json\n${JSON.stringify(sharedContext, null, 2)}\n\`\`\`\nIf you modify this shared state during your task, you MUST return the final updated JSON wrapped in a \`<updated_shared_context>\` XML block at the very end of your final response.`
       : undefined,
     `[Subagent Task]: ${task}`,
   ]
@@ -585,12 +595,13 @@ export async function spawnSubagentDirect(
   if (expectsCompletionMessage) {
     if (!isCronSession) {
       // Use config wait timeout
-      const waitTimeoutMs = typeof params.runTimeoutSeconds === "number" && params.runTimeoutSeconds > 0
-        ? params.runTimeoutSeconds * 1000 + 10_000
-        : 300_000; // default 5m wait for inline result
+      const waitTimeoutMs =
+        typeof params.runTimeoutSeconds === "number" && params.runTimeoutSeconds > 0
+          ? params.runTimeoutSeconds * 1000 + 10_000
+          : 300_000; // default 5m wait for inline result
 
       await waitForSubagentCompletion(childRunId, waitTimeoutMs);
-      
+
       // Attempt to read the final message from the session
       try {
         const text = await readLatestSubagentOutput(childSessionKey);

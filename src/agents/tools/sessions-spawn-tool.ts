@@ -24,8 +24,16 @@ const SessionsSpawnToolSchema = Type.Object({
   mode: optionalStringEnum(SUBAGENT_SPAWN_MODES),
   cleanup: optionalStringEnum(["delete", "keep"] as const),
   sandbox: optionalStringEnum(SESSIONS_SPAWN_SANDBOX_MODES),
-  tools: Type.Optional(Type.Array(Type.String(), { description: "Optional explicit list of tools to use, replacing the default policy." })),
-  skills: Type.Optional(Type.Array(Type.String(), { description: "Optional explicit list of skills to load, replacing the default policy." })),
+  tools: Type.Optional(
+    Type.Array(Type.String(), {
+      description: "Optional explicit list of tools to use, replacing the default policy.",
+    }),
+  ),
+  skills: Type.Optional(
+    Type.Array(Type.String(), {
+      description: "Optional explicit list of skills to load, replacing the default policy.",
+    }),
+  ),
   /**
    * Whether to wait for the subagent to complete before returning.
    *
@@ -38,7 +46,12 @@ const SessionsSpawnToolSchema = Type.Object({
    *   Only use this when you need the result before proceeding (single sequential task).
    */
   wait: Type.Optional(Type.Boolean()),
-  sharedContext: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: "Optional JSON context to share state with the subagent, functioning as its initial memory." })),
+  sharedContext: Type.Optional(
+    Type.Record(Type.String(), Type.Unknown(), {
+      description:
+        "Optional JSON context to share state with the subagent, functioning as its initial memory.",
+    }),
+  ),
 });
 
 export function createSessionsSpawnTool(opts?: {
@@ -53,6 +66,8 @@ export function createSessionsSpawnTool(opts?: {
   sandboxed?: boolean;
   /** Explicit agent ID override for cron/hook sessions where session key parsing may not work. */
   requesterAgentIdOverride?: string;
+  /** Multi-agent Cognitive Loop Fusion: current recursive iteration depth */
+  iterationDepth?: number;
 }): AnyAgentTool {
   return {
     label: "Sessions",
@@ -67,8 +82,8 @@ export function createSessionsSpawnTool(opts?: {
       if (!params || typeof params !== "object" || !("task" in params)) {
         throw new Error(
           `Missing required parameter 'task'. You must provide a task description for the subagent.\n` +
-          `Example: { "task": "Research NVIDIA's latest GPU products and summarize findings", "label": "nvidia-research" }\n` +
-          `Parameters: task (required), label, runtime (subagent|acp), model, agentId, runTimeoutSeconds`,
+            `Example: { "task": "Research NVIDIA's latest GPU products and summarize findings", "label": "nvidia-research" }\n` +
+            `Parameters: task (required), label, runtime (subagent|acp), model, agentId, runTimeoutSeconds`,
         );
       }
 
@@ -100,9 +115,18 @@ export function createSessionsSpawnTool(opts?: {
       // and delivers its result asynchronously. Use this to launch parallel subagents.
       // wait=true: block until the subagent finishes and return completionText inline.
       const wait = params.wait === true;
-      const tools = Array.isArray(params.tools) && params.tools.every(t => typeof t === "string") ? params.tools : undefined;
-      const skills = Array.isArray(params.skills) && params.skills.every(t => typeof t === "string") ? params.skills : undefined;
-      const sharedContext = params.sharedContext && typeof params.sharedContext === "object" ? (params.sharedContext as Record<string, unknown>) : undefined;
+      const tools =
+        Array.isArray(params.tools) && params.tools.every((t) => typeof t === "string")
+          ? params.tools
+          : undefined;
+      const skills =
+        Array.isArray(params.skills) && params.skills.every((t) => typeof t === "string")
+          ? params.skills
+          : undefined;
+      const sharedContext =
+        params.sharedContext && typeof params.sharedContext === "object"
+          ? (params.sharedContext as Record<string, unknown>)
+          : undefined;
 
       const result =
         runtime === "acp"
@@ -150,6 +174,7 @@ export function createSessionsSpawnTool(opts?: {
                 agentGroupChannel: opts?.agentGroupChannel,
                 agentGroupSpace: opts?.agentGroupSpace,
                 requesterAgentIdOverride: opts?.requesterAgentIdOverride,
+                iterationDepth: opts?.iterationDepth,
               },
             );
 

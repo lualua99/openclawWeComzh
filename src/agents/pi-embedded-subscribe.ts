@@ -79,6 +79,9 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     pendingMessagingTargets: new Map(),
     successfulCronAdds: 0,
     pendingMessagingMediaUrls: new Map(),
+    iterationDepth: params.iterationDepth ?? 0,
+    chaosScore: 0,
+    lastActionFingerprint: undefined,
   };
   const usageTotals = {
     input: 0,
@@ -679,6 +682,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     didSendViaMessagingTool: () => messagingToolSentTexts.length > 0,
     getLastToolError: () => (state.lastToolError ? { ...state.lastToolError } : undefined),
     getConsecutiveToolErrors: () => state.consecutiveToolErrors,
+    getChaosScore: () => state.chaosScore,
     resetConsecutiveToolErrors: () => {
       state.consecutiveToolErrors = 0;
     },

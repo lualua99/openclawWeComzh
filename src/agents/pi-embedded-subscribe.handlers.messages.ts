@@ -56,6 +56,8 @@ export function resolveSilentReplyFallbackText(params: {
   return fallback;
 }
 
+import { handleCognitiveSignal } from "./pi-embedded-subscribe.handlers.signals.js";
+
 export function handleMessageStart(
   ctx: EmbeddedPiSubscribeContext,
   evt: AgentEvent & { message: AgentMessage },
@@ -63,6 +65,16 @@ export function handleMessageStart(
   const msg = evt.message;
   if (msg?.role !== "assistant") {
     return;
+  }
+
+  // Handle internal events (e.g. Cognitive Loop Fusion signals from sub-agents)
+  const internalEvents = (msg as unknown as { internalEvents?: unknown }).internalEvents;
+  if (Array.isArray(internalEvents)) {
+    for (const internalEvent of internalEvents) {
+      if (internalEvent.type === "cognitive_signal") {
+        handleCognitiveSignal(ctx, internalEvent);
+      }
+    }
   }
 
   // KNOWN: Resetting at `text_end` is unsafe (late/duplicate end events).

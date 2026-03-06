@@ -586,6 +586,7 @@ export async function runEmbeddedAttempt(
           requireExplicitMessageTarget:
             params.requireExplicitMessageTarget ?? isSubagentSessionKey(params.sessionKey),
           disableMessageTool: params.disableMessageTool,
+          iterationDepth: params.iterationDepth,
         });
     const tools = sanitizeToolsForGoogle({ tools: toolsRaw, provider: params.provider });
     const allowedToolNames = collectAllowedToolNames({
@@ -1148,22 +1149,30 @@ export async function runEmbeddedAttempt(
         onAssistantMessageStart: params.onAssistantMessageStart,
         onAgentEvent: (evt) => {
           if (params.onAgentEvent) {
-             params.onAgentEvent(evt);
+            params.onAgentEvent(evt);
           }
           // The subscription object is captured via closure since
           // tool result events fire asynchronously during prompt execution.
+          const consecutiveErrors = subscription?.getConsecutiveToolErrors() ?? 0;
+          const chaosScore = subscription?.getChaosScore() ?? 0;
           if (
             evt.stream === "tool" &&
-            (evt.data)?.phase === "result" &&
-            (subscription?.getConsecutiveToolErrors() ?? 0) >= 3
+            evt.data?.phase === "result" &&
+            (consecutiveErrors >= 3 || chaosScore >= 5)
           ) {
-            log.warn(`intercepting run ${params.runId} due to 3 consecutive tool errors - triggering reflection mode (Z²)`);
+            const reason =
+              consecutiveErrors >= 3
+                ? "3 consecutive tool errors"
+                : `algorithmic divergence (chaosScore=${chaosScore})`;
+            log.warn(
+              `intercepting run ${params.runId} due to ${reason} - triggering reflection mode (Z²)`,
+            );
             subscription?.resetConsecutiveToolErrors();
             activeSession
               .steer(
-                "System Hook: You have failed 3 times in a row. You are now in Reflection Mode (Z²). " +
+                `System Hook: You have been intercepted due to ${reason}. You are now in Reflection Mode (Z²). ` +
                   "You are FORBIDDEN from calling any tools in this turn. " +
-                  "You must output a detailed analysis of the failure in a `<reflection>` block and propose a new approach (C) before proceeding.",
+                  "You must output a detailed analysis of the situation in a `<reflection>` block and propose a new approach (C) before proceeding.",
               )
               .catch((err) => {
                 log.error(`failed to inject reflection steering: ${String(err)}`);

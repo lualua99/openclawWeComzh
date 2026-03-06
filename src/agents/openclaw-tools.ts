@@ -14,11 +14,11 @@ import { createImageTool } from "./tools/image-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
+import { createSessionsEvaluateTool } from "./tools/sessions-evaluate-tool.js";
 import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
 import { createSessionsSendTool } from "./tools/sessions-send-tool.js";
 import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
-import { createSessionsEvaluateTool } from "./tools/sessions-evaluate-tool.js";
 import { createSubagentsTool } from "./tools/subagents-tool.js";
 import { createTaskPlannerTool } from "./tools/task-planner-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
@@ -71,6 +71,8 @@ export function createOpenClawTools(options?: {
   requesterSenderId?: string | null;
   /** Whether the requesting sender is an owner. */
   senderIsOwner?: boolean;
+  /** Multi-agent Cognitive Loop Fusion: current recursive iteration depth */
+  iterationDepth?: number;
 }): AnyAgentTool[] {
   const workspaceDir = resolveWorkspaceRoot(options?.workspaceDir);
   const imageTool = options?.agentDir?.trim()
@@ -164,6 +166,7 @@ export function createOpenClawTools(options?: {
       agentGroupSpace: options?.agentGroupSpace,
       sandboxed: options?.sandboxed,
       requesterAgentIdOverride: options?.requesterAgentIdOverride,
+      iterationDepth: options?.iterationDepth,
     }),
     createSessionsEvaluateTool({
       agentSessionKey: options?.agentSessionKey,

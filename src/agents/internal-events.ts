@@ -1,4 +1,4 @@
-export type AgentInternalEventType = "task_completion";
+export type AgentInternalEventType = "task_completion" | "cognitive_signal";
 
 export type AgentTaskCompletionInternalEvent = {
   type: "task_completion";
@@ -14,7 +14,30 @@ export type AgentTaskCompletionInternalEvent = {
   replyInstruction: string;
 };
 
-export type AgentInternalEvent = AgentTaskCompletionInternalEvent;
+export type AgentCognitiveSignalInternalEvent = {
+  type: "cognitive_signal";
+  source: "subagent";
+  childSessionKey: string;
+  signal: "convergence" | "divergence";
+  reason?: string;
+  depth: number;
+};
+
+export type AgentInternalEvent =
+  | AgentTaskCompletionInternalEvent
+  | AgentCognitiveSignalInternalEvent;
+
+function formatCognitiveSignalEvent(event: AgentCognitiveSignalInternalEvent): string {
+  const emoji = event.signal === "convergence" ? "🎯" : "🌀";
+  return [
+    `[Cognitive signal: ${event.signal} ${emoji}]`,
+    `source: ${event.childSessionKey}`,
+    `depth: ${event.depth}`,
+    event.reason ? `reason: ${event.reason}` : undefined,
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join("\n");
+}
 
 function formatTaskCompletionEvent(event: AgentTaskCompletionInternalEvent): string {
   const lines = [
@@ -44,6 +67,9 @@ export function formatAgentInternalEventsForPrompt(events?: AgentInternalEvent[]
     .map((event) => {
       if (event.type === "task_completion") {
         return formatTaskCompletionEvent(event);
+      }
+      if (event.type === "cognitive_signal") {
+        return formatCognitiveSignalEvent(event);
       }
       return "";
     })

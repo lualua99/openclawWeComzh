@@ -1,4 +1,4 @@
-
+import { html, nothing } from "lit";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { t, i18n } from "../i18n/index.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
@@ -7,6 +7,7 @@ import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.h
 import "./components/language-switcher.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import { loadAgentFileContent, loadAgentFiles, saveAgentFile } from "./controllers/agent-files.ts";
+import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import {
   deleteAgentKnowledgeFile,
   loadAgentKnowledge,
@@ -14,7 +15,6 @@ import {
   loadAgentKnowledgeStatus,
   saveAgentKnowledgeFile,
 } from "./controllers/agent-knowledge.ts";
-import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
 import { loadAgents, loadToolsCatalog } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
@@ -168,8 +168,7 @@ export function renderApp(state: AppViewState) {
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
-  const configValue =
-    state.configForm ?? state.configSnapshot?.config ?? null;
+  const configValue = state.configForm ?? state.configSnapshot?.config ?? null;
   const basePath = normalizeBasePath(state.basePath ?? "");
   const resolvedAgentId =
     state.agentsSelectedId ??
@@ -757,18 +756,26 @@ export function renderApp(state: AppViewState) {
                   void loadAgentKnowledgeFileContent(state, resolvedAgentId, name);
                 },
                 onKnowledgeFileDraftChange: (name, content) => {
-                  state.agentKnowledgeFileDrafts = { ...state.agentKnowledgeFileDrafts, [name]: content };
+                  state.agentKnowledgeFileDrafts = {
+                    ...state.agentKnowledgeFileDrafts,
+                    [name]: content,
+                  };
                 },
                 onKnowledgeFileReset: (name) => {
                   const base = state.agentKnowledgeFileContents[name] ?? "";
-                  state.agentKnowledgeFileDrafts = { ...state.agentKnowledgeFileDrafts, [name]: base };
+                  state.agentKnowledgeFileDrafts = {
+                    ...state.agentKnowledgeFileDrafts,
+                    [name]: base,
+                  };
                 },
                 onKnowledgeFileSave: (name) => {
                   if (!resolvedAgentId) {
                     return;
                   }
                   const content =
-                    state.agentKnowledgeFileDrafts[name] ?? state.agentKnowledgeFileContents[name] ?? "";
+                    state.agentKnowledgeFileDrafts[name] ??
+                    state.agentKnowledgeFileContents[name] ??
+                    "";
                   void saveAgentKnowledgeFile(state, resolvedAgentId, name, content);
                 },
                 onKnowledgeFileDelete: (name) => {
@@ -1041,9 +1048,7 @@ export function renderApp(state: AppViewState) {
                 devicesLoading: state.devicesLoading,
                 devicesError: state.devicesError,
                 devicesList: state.devicesList,
-                configForm:
-                  state.configForm ??
-                  state.configSnapshot?.config ?? null,
+                configForm: state.configForm ?? state.configSnapshot?.config ?? null,
                 configLoading: state.configLoading,
                 configSaving: state.configSaving,
                 configDirty: state.configFormDirty,

@@ -238,6 +238,8 @@ export function createOpenClawCodingTools(options?: {
   toolsOverride?: string[];
   /** Whether the sender is an owner (required for owner-only tools). */
   senderIsOwner?: boolean;
+  /** Multi-agent Cognitive Loop Fusion: current recursive iteration depth */
+  iterationDepth?: number;
 }): AnyAgentTool[] {
   const execToolName = "exec";
   const sandbox = options?.sandbox?.enabled ? options.sandbox : undefined;
@@ -495,6 +497,7 @@ export function createOpenClawCodingTools(options?: {
       requesterAgentIdOverride: agentId,
       requesterSenderId: options?.senderId,
       senderIsOwner: options?.senderIsOwner,
+      iterationDepth: options?.iterationDepth,
     }),
   ];
   const toolsForMessageProvider = applyMessageProviderToolPolicy(tools, options?.messageProvider);
@@ -520,7 +523,10 @@ export function createOpenClawCodingTools(options?: {
       }),
       { policy: sandbox?.tools, label: "sandbox tools.allow" },
       { policy: subagentPolicy, label: "subagent tools.allow" },
-      { policy: options?.toolsOverride ? { allow: options.toolsOverride } : undefined, label: "toolsOverride" },
+      {
+        policy: options?.toolsOverride ? { allow: options.toolsOverride } : undefined,
+        label: "toolsOverride",
+      },
     ],
   });
   // Always normalize tool JSON Schemas before handing them to pi-agent/pi-ai.

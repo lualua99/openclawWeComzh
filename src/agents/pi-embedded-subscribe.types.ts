@@ -31,6 +31,8 @@ export type SubscribeEmbeddedPiSessionParams = {
   enforceFinalTag?: boolean;
   config?: OpenClawConfig;
   sessionKey?: string;
+  /** Multi-agent Cognitive Loop Fusion: current recursive iteration depth */
+  iterationDepth?: number;
 };
 
 export type { BlockReplyChunking } from "./pi-embedded-block-chunker.js";

@@ -106,6 +106,30 @@ export function extractTaskResult(text: string | undefined): TaskResult | undefi
   return undefined;
 }
 
+const COGNITIVE_SIGNAL_REGEX = /(Convergence|Divergence)\[(.*?)\]/i;
+
+/**
+ * Extract Cognitive Loop Fusion signals (Convergence/Divergence).
+ */
+export function extractCognitiveSignal(text: string | undefined):
+  | {
+      signal: "convergence" | "divergence";
+      reason?: string;
+    }
+  | undefined {
+  if (!text) {
+    return undefined;
+  }
+  const match = COGNITIVE_SIGNAL_REGEX.exec(text);
+  if (!match) {
+    return undefined;
+  }
+  return {
+    signal: match[1].toLowerCase() === "convergence" ? "convergence" : "divergence",
+    reason: match[2]?.trim() || undefined,
+  };
+}
+
 /**
  * Strip the `<task_result>` XML block from the findings text so the
  * human-readable portion is clean.
@@ -1501,6 +1525,21 @@ export async function runSubagentAnnounceFlow(params: {
         replyInstruction,
       },
     ];
+
+    // Detect and add cognitive signals (Convergence/Divergence)
+    const cognitiveSignal = extractCognitiveSignal(findings);
+    if (cognitiveSignal) {
+      const childDepthForSignal = getSubagentDepthFromSessionStore(params.childSessionKey);
+      internalEvents.push({
+        type: "cognitive_signal",
+        source: "subagent",
+        childSessionKey: params.childSessionKey,
+        signal: cognitiveSignal.signal,
+        reason: cognitiveSignal.reason,
+        depth: childDepthForSignal,
+      });
+    }
+
     triggerMessage = buildAnnounceSteerMessage(internalEvents);
     steerMessage = triggerMessage;
 

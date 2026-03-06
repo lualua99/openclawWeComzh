@@ -78,6 +78,13 @@ export type EmbeddedPiSubscribeState = {
   successfulCronAdds: number;
   pendingMessagingMediaUrls: Map<string, string[]>;
   lastAssistant?: AgentMessage;
+
+  /** Multi-agent Cognitive Loop Fusion: current recursive iteration */
+  iterationDepth: number;
+  /** Multi-agent Cognitive Loop Fusion: detected divergence/instability score */
+  chaosScore: number;
+  /** Multi-agent Cognitive Loop Fusion: fingerprint of the last tool action for repetition detection */
+  lastActionFingerprint?: string;
 };
 
 export type EmbeddedPiSubscribeContext = {
@@ -151,6 +158,9 @@ export type ToolHandlerState = Pick<
   | "messagingToolSentMediaUrls"
   | "messagingToolSentTargets"
   | "successfulCronAdds"
+  | "iterationDepth"
+  | "chaosScore"
+  | "lastActionFingerprint"
 >;
 
 export type ToolHandlerContext = {
