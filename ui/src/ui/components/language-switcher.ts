@@ -1,6 +1,5 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { icons } from "../icons.ts";
 
 export type SupportedLocale = "en" | "zh-CN";
 
@@ -147,21 +146,21 @@ export class LanguageSwitcher extends LitElement {
     const currentLabel = this.locale.startsWith("zh") ? "简体中文" : "English";
 
     return html`
-      <button @click=\${this.handleToggle}>
-        <span class="icon">\${globeIcon}</span>
-        <span>\${currentLabel}</span>
+      <button @click=${() => this.handleToggle()}>
+        <span class="icon">${globeIcon}</span>
+        <span>${currentLabel}</span>
       </button>
 
-      <div class="menu \${this.menuOpen ? "open" : ""}">
+      <div class="menu ${this.menuOpen ? "open" : ""}">
         <button 
-          class="menu-item \${this.locale.startsWith("en") ? "active" : ""}" 
-          @click=\${() => this.handleSelect("en")}
+          class="menu-item ${this.locale.startsWith("en") ? "active" : ""}" 
+          @click=${() => this.handleSelect("en")}
         >
           English
         </button>
         <button 
-          class="menu-item \${this.locale.startsWith("zh") ? "active" : ""}" 
-          @click=\${() => this.handleSelect("zh-CN")}
+          class="menu-item ${this.locale.startsWith("zh") ? "active" : ""}" 
+          @click=${() => this.handleSelect("zh-CN")}
         >
           简体中文
         </button>
