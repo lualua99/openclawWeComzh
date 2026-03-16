@@ -1,9 +1,22 @@
-# 🦞 openclawWeComzh — Personal AI Assistant
+# 🦞 此项目将不在维护该项目所有升级请移步 https://github.com/openaeon/OpenAEON
+##  > 📦 **开源仓库主页**: [https://github.com/openaeon/OpenAEON](https://github.com/openaeon/OpenAEON)
+
+>
+>
+>
+>
+>
+>
+>
+
+
+
+###  🦞 openclawWeComzh — Personal AI Assistant
 
 > **为国内生态倾力打造的 OpenClaw 深度中文化版本。**
 > 这是一个让你可以在本地私有化运行、掌控全局的私人 AI 智能体工作流引擎。
 >
-> 📦 **开源仓库主页**: [https://github.com/luolin-ai/openclawWeComzh](https://github.com/luolin-ai/openclawWeComzh)
+
 
 <p align="center">
     <picture>
