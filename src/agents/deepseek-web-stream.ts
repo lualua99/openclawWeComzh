@@ -25,17 +25,29 @@ const REGEX_THINK_START = /<(?:think(?:ing)?|thought)\b[^<>]*>/i;
 const REGEX_THINK_END = /<\/(?:think(?:ing)?|thought)\b[^<>]*>/i;
 const REGEX_FINAL_START = /<final\b[^<>]*>/i;
 const REGEX_FINAL_END = /<\/final\b[^<>]*>/i;
-const REGEX_TOOL_CALL_START = /<tool_call(?:\s+[^>]*)?>/i;
-const REGEX_TOOL_CALL_END = /<\/tool_call\b[^<>]*>/i;
+const REGEX_TOOL_CALL_START = /<(?:tool_call|tool_response)(?:\s+[^>]*)?>/i;
+const REGEX_TOOL_CALL_END = /<\/(?:tool_call|tool_response)\b[^<>]*>/i;
 const REGEX_REPLY = /\[\[reply_to_current\]\]/i;
 const REGEX_MALFORMED_THINK = /\n?think\s*>/i;
 
 function extractToolCallAttrs(tag: string): { id: string | null; name: string } {
-  const idMatch = tag.match(/\bid\s*=\s*['"]?([^'"'\s]+)['"]?/i);
-  const nameMatch = tag.match(/\bname\s*=\s*['"]?([^'"'\s]+)['"]?/i);
+  const isToolResponse = tag.toLowerCase().includes("tool_response");
+  const idMatch = tag.match(/\bid\s*=\s*(['"]?)([^'"'\s]+)\1/i);
+  const nameMatch = tag.match(/\bname\s*=\s*(['"]?)([^'"'\s]*)\1/i);
+  let id = idMatch ? idMatch[2] : null;
+  let name = nameMatch ? nameMatch[2] : "";
+  if (isToolResponse) {
+    if (id && !name) {
+      name = id;
+      id = null;
+    }
+  }
+  if (!name && id) {
+    name = id;
+  }
   return {
-    id: idMatch ? idMatch[1] : null,
-    name: nameMatch ? nameMatch[1] : "",
+    id,
+    name,
   };
 }
 const JUNK_TOKENS = ["<｜end▁of▁thinking｜>", "<|endoftext|>"];
