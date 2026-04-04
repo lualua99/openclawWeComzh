@@ -109,6 +109,43 @@
   --duration-slow: 350ms;
 
   color-scheme: light;
+
+  /* Material You Dynamic Color - Light */
+  --md-sys-color-primary: #1677ff;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d6e3ff;
+  --md-sys-color-on-primary-container: #001b3d;
+  --md-sys-color-secondary: #555f70;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #d9e3f8;
+  --md-sys-color-on-secondary-container: #121c2b;
+  --md-sys-color-tertiary: #705575;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #fad8fd;
+  --md-sys-color-on-tertiary-container: #28132e;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+  --md-sys-color-background: #fdfcff;
+  --md-sys-color-on-background: #1a1b1f;
+  --md-sys-color-surface: #fdfcff;
+  --md-sys-color-on-surface: #1a1b1f;
+  --md-sys-color-surface-variant: #e0e2ec;
+  --md-sys-color-on-surface-variant: #44464f;
+  --md-sys-color-outline: #74777f;
+  --md-sys-color-outline-variant: #c4c6d0;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-inverse-surface: #2f3033;
+  --md-sys-color-inverse-on-surface: #f1f0f4;
+  --md-sys-color-inverse-primary: #a9c7ff;
+
+  /* Material You Surface Tones */
+  --md-sys-color-surface-1: #f8f9ff;
+  --md-sys-color-surface-2: #f3f4fc;
+  --md-sys-color-surface-3: #eeeff9;
+  --md-sys-color-surface-4: #ecedf7;
+  --md-sys-color-surface-5: #e8eaf4;
 }
 
 /* Dark theme */
@@ -183,6 +220,43 @@
   --shadow-glow: 0 0 20px var(--accent-glow);
 
   color-scheme: dark;
+
+  /* Material You Dynamic Color - Dark */
+  --md-sys-color-primary: #a9c7ff;
+  --md-sys-color-on-primary: #003062;
+  --md-sys-color-primary-container: #00468a;
+  --md-sys-color-on-primary-container: #d6e3ff;
+  --md-sys-color-secondary: #bdc7db;
+  --md-sys-color-on-secondary: #273141;
+  --md-sys-color-secondary-container: #3d4758;
+  --md-sys-color-on-secondary-container: #d9e3f8;
+  --md-sys-color-tertiary: #dcbce1;
+  --md-sys-color-on-tertiary: #3f2844;
+  --md-sys-color-tertiary-container: #573e5c;
+  --md-sys-color-on-tertiary-container: #fad8fd;
+  --md-sys-color-error: #ffb4ab;
+  --md-sys-color-on-error: #690005;
+  --md-sys-color-error-container: #93000a;
+  --md-sys-color-on-error-container: #ffdad6;
+  --md-sys-color-background: #1a1b1f;
+  --md-sys-color-on-background: #e3e2e6;
+  --md-sys-color-surface: #1a1b1f;
+  --md-sys-color-on-surface: #e3e2e6;
+  --md-sys-color-surface-variant: #44464f;
+  --md-sys-color-on-surface-variant: #c4c6d0;
+  --md-sys-color-outline: #8e9099;
+  --md-sys-color-outline-variant: #44464f;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-inverse-surface: #e3e2e6;
+  --md-sys-color-inverse-on-surface: #2f3033;
+  --md-sys-color-inverse-primary: #1677ff;
+
+  /* Material You Surface Tones */
+  --md-sys-color-surface-1: #1f2024;
+  --md-sys-color-surface-2: #232427;
+  --md-sys-color-surface-3: #27282c;
+  --md-sys-color-surface-4: #292a2e;
+  --md-sys-color-surface-5: #2d2e33;
 }
 
 * {

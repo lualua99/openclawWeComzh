@@ -20,12 +20,11 @@ export type MessageGroup = {
 };
 
 /** Content item types in a normalized message */
-export type MessageContentItem = {
-  type: "text" | "tool_call" | "tool_result";
-  text?: string;
-  name?: string;
-  args?: unknown;
-};
+export type MessageContentItem =
+  | { type: "text"; text?: string }
+  | { type: "tool_call"; name?: string; args?: unknown }
+  | { type: "tool_result"; name?: string; text?: string }
+  | { type: "thinking"; thinking?: string };
 
 /** Normalized message structure for rendering */
 export type NormalizedMessage = {

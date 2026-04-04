@@ -30,29 +30,25 @@
 }
 
 /* ===========================================
-   Cards - Refined with depth
+   Cards - Material You Style
    =========================================== */
 
 .card {
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface);
+  border-radius: 12px;
   padding: 20px;
   animation: rise 0.35s var(--ease-out) backwards;
   transition:
     border-color var(--duration-normal) var(--ease-out),
     box-shadow var(--duration-normal) var(--ease-out),
     transform var(--duration-normal) var(--ease-out);
-  box-shadow:
-    var(--shadow-sm),
-    inset 0 1px 0 var(--card-highlight);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .card:hover {
-  border-color: var(--border-strong);
-  box-shadow:
-    var(--shadow-md),
-    inset 0 1px 0 var(--card-highlight);
+  border-color: var(--md-sys-color-outline);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
 }
 
 .card-title {
@@ -204,30 +200,34 @@
 }
 
 /* ===========================================
-   Labels & Pills
+   Labels & Pills - Material You Style
    =========================================== */
 
 .label {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
   font-weight: 500;
 }
 
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border: 1px solid var(--border);
-  padding: 6px 12px;
-  border-radius: var(--radius-full);
-  background: var(--secondary);
-  font-size: 13px;
+  gap: 8px;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: var(--md-sys-color-secondary-container);
+  font-size: 14px;
   font-weight: 500;
-  transition: border-color var(--duration-fast) ease;
+  color: var(--md-sys-color-on-secondary-container);
+  transition: 
+    background var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
 }
 
 .pill:hover {
-  border-color: var(--border-strong);
+  background: var(--md-sys-color-surface-variant);
+  transform: translateY(-1px);
 }
 
 .pill.danger {
@@ -334,7 +334,7 @@
 }
 
 /* ===========================================
-   Buttons - Tactile with personality
+   Buttons - Material You Style
    =========================================== */
 
 .btn {
@@ -342,30 +342,29 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  padding: 9px 16px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
+  border: none;
+  background: var(--md-sys-color-primary);
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
   cursor: pointer;
   transition:
-    border-color var(--duration-fast) var(--ease-out),
     background var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-strong);
+  background: var(--md-sys-color-primary-container);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
 }
 
 .btn:active {
-  background: var(--secondary);
+  background: var(--md-sys-color-secondary);
   transform: translateY(0);
   box-shadow: none;
 }
@@ -382,18 +381,15 @@
 }
 
 .btn.primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--primary-foreground);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .btn.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-  box-shadow:
-    var(--shadow-md),
-    0 0 20px var(--accent-glow);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* Keyboard shortcut badge (shadcn style) */
@@ -465,12 +461,12 @@
 }
 
 /* ===========================================
-   Form Fields
+   Form Fields - Material You Style
    =========================================== */
 
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .field.full {
@@ -478,30 +474,29 @@
 }
 
 .field span {
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
   font-weight: 500;
 }
 
 .field input,
 .field textarea,
 .field select {
-  border: 1px solid var(--input);
-  background: var(--card);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
+  border: none;
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 4px 4px 0 0;
+  padding: 12px 16px;
   outline: none;
-  box-shadow: inset 0 1px 0 var(--card-highlight);
+  font-size: 14px;
   transition:
-    border-color var(--duration-fast) ease,
-    box-shadow var(--duration-fast) ease;
+    background var(--duration-fast) ease;
 }
 
 .field input:focus,
 .field textarea:focus,
 .field select:focus {
-  border-color: var(--ring);
-  box-shadow: var(--focus-ring);
+  background: var(--md-sys-color-surface);
+  border-bottom: 2px solid var(--md-sys-color-primary);
 }
 
 .field select {
@@ -1364,7 +1359,7 @@
 }
 
 /* ===========================================
-   Chips - Compact and punchy
+   Chips - Material You Style
    =========================================== */
 
 .chip-row {
@@ -1374,21 +1369,23 @@
 }
 
 .chip {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  padding: 5px 12px;
-  color: var(--muted);
-  background: var(--secondary);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-variant);
   transition:
-    border-color var(--duration-fast) var(--ease-out),
     background var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out);
 }
 
 .chip:hover {
-  border-color: var(--border-strong);
+  background: var(--md-sys-color-secondary-container);
   transform: translateY(-1px);
 }
 
@@ -1728,38 +1725,24 @@
   justify-items: end;
 }
 
-/* Chat bubbles */
+/* Chat bubbles - Material You Style */
 .chat-bubble {
-  border: 1px solid transparent;
-  background: var(--card);
-  border-radius: var(--radius-lg);
-  padding: 10px 14px;
+  border: none;
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: 12px 12px 4px 12px;
+  padding: 12px 16px;
   min-width: 0;
-}
-
-:root[data-theme="light"] .chat-bubble {
-  border-color: var(--border);
-  background: var(--bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .chat-line.user .chat-bubble {
-  border-color: transparent;
-  background: var(--accent-subtle);
-}
-
-:root[data-theme="light"] .chat-line.user .chat-bubble {
-  border-color: rgba(234, 88, 12, 0.2);
-  background: rgba(251, 146, 60, 0.12);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: 12px 12px 12px 4px;
 }
 
 .chat-line.assistant .chat-bubble {
-  border-color: transparent;
-  background: var(--secondary);
-}
-
-:root[data-theme="light"] .chat-line.assistant .chat-bubble {
-  border-color: var(--border);
-  background: var(--bg-muted);
+  background: var(--md-sys-color-surface-container-high);
 }
 
 @keyframes chatStreamPulse {

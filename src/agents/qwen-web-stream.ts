@@ -10,6 +10,7 @@ import {
 } from "@mariozechner/pi-ai";
 import type { AgentStreamParams } from "../commands/agent/types.js";
 import { QwenWebClient, type QwenWebClientOptions } from "../providers/qwen-web-client.js";
+import { emitAgentEvent } from "../infra/agent-events.js";
 
 const sessionMap = new Map<string, string>();
 const parentMessageMap = new Map<string, string>();
@@ -32,11 +33,32 @@ export function createQwenWebStreamFn(
 
     const run = async () => {
       try {
-        const sessionKey = (context as unknown as { sessionId?: string }).sessionId || "default";
+        const streamContext = context as unknown as { sessionId?: string; runId?: string; sessionKey?: string };
+        const sessionKey = streamContext.sessionId || "default";
+        const runId = streamContext.runId;
 
         // Mode mapping logic (moved up to detect changes)
         const isThinkingModel = model.id.toLowerCase().includes("thinking");
         let deepSearch = streamParams?.webSearchEnabled ?? true;
+
+        let lastEmittedThinking = "";
+        const emitThinkingEvent = (text: string, isStart: boolean = false) => {
+          if (!runId) {
+            return;
+          }
+          const prior = lastEmittedThinking ?? "";
+          const delta = text.startsWith(prior) ? text.slice(prior.length) : text;
+          if (!delta && !isStart) {
+            return;
+          }
+          lastEmittedThinking = text;
+          emitAgentEvent({
+            runId,
+            stream: "thinking",
+            data: { text, delta },
+            sessionKey: streamContext.sessionKey,
+          });
+        };
 
 
         // Force new session if search mode changed to prevent sticky tools/behavior
@@ -349,6 +371,7 @@ export function createQwenWebStreamFn(
                 contentIndex: index,
                 partial: createPartial(),
               });
+              emitThinkingEvent("", true);
             } else if (type === "toolcall") {
               const toolId = forceId || `call_${Date.now()}_${index}`;
               contentParts[index] = {
@@ -388,6 +411,8 @@ export function createQwenWebStreamFn(
               delta,
               partial: createPartial(),
             });
+            const currentThinking = (contentParts[index] as ThinkingContent).thinking;
+            emitThinkingEvent(currentThinking);
           } else if (type === "toolcall") {
             accumulatedToolCalls[currentToolIndex].arguments += delta;
             stream.push({
@@ -642,6 +667,7 @@ export function createQwenWebStreamFn(
                               delta: "",
                               partial: createPartial(),
                             });
+                            emitThinkingEvent(newThinking);
                           }
                         } else {
                           pushDelta(planMd + "\n", "thinking");
@@ -667,6 +693,7 @@ export function createQwenWebStreamFn(
                         ?.thinking || "";
                     if (!currentThinking.includes("🔍 Searching")) {
                       pushDelta("\n> 🔍 **Searching for information...**\n", "thinking");
+                      emitThinkingEvent(currentThinking + "\n> 🔍 **Searching for information...**\n");
                     }
                   }
                 }

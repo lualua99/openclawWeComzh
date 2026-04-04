@@ -311,7 +311,7 @@ const saveSessionToMemory: HookHandler = async (event) => {
 
     // Log completion (but don't send user-visible confirmation - it's internal housekeeping)
     const relPath = memoryFilePath.replace(os.homedir(), "~");
-    log.info(`Session context saved to ${relPath}`);
+    log.info(`💾 会话上下文已保存至 ${relPath}`);
   } catch (err) {
     if (err instanceof Error) {
       log.error("Failed to save session memory", {

@@ -38,12 +38,18 @@ export function normalizeMessage(message: unknown): NormalizedMessage {
   if (typeof m.content === "string") {
     content = [{ type: "text", text: m.content }];
   } else if (Array.isArray(m.content)) {
-    content = m.content.map((item: Record<string, unknown>) => ({
-      type: (item.type as MessageContentItem["type"]) || "text",
-      text: item.text as string | undefined,
-      name: item.name as string | undefined,
-      args: item.args || item.arguments,
-    }));
+    content = m.content.map((item: Record<string, unknown>): MessageContentItem => {
+      const itemType = (item.type as string || "text").toLowerCase();
+      if (itemType === "thinking") {
+        return { type: "thinking", thinking: item.thinking as string | undefined };
+      }
+      return {
+        type: (item.type as MessageContentItem["type"]) || "text",
+        text: item.text as string | undefined,
+        name: item.name as string | undefined,
+        args: item.args || item.arguments,
+      };
+    });
   } else if (typeof m.text === "string") {
     content = [{ type: "text", text: m.text }];
   }

@@ -132,3 +132,4 @@ dist/protocol.schema.json
 
 # Synthing
 **/.stfolder/
+.trae/rules/project-rules.md

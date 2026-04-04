@@ -12,6 +12,7 @@ import {
   DeepSeekWebClient,
   type DeepSeekWebClientOptions,
 } from "../providers/deepseek-web-client.js";
+import { emitAgentEvent } from "../infra/agent-events.js";
 
 interface DeepseekStreamOptions {
   searchEnabled?: boolean;
@@ -32,6 +33,8 @@ type MessageContentPart = {
 
 interface DeepSeekStreamContext {
   sessionId: string;
+  runId?: string;
+  sessionKey?: string;
   systemPrompt: string;
   messages: Array<{
     role: string;
@@ -110,7 +113,7 @@ function buildPrompt(
 
     if (systemPromptContent && !messages.some((m) => m.role === "system")) {
       console.log(
-        `[DeepseekWebStream] Prepending separate systemPrompt (length=${systemPromptContent.length})`,
+        `[DeepseekWebStream] 📋 附加系统提示 (长度=${systemPromptContent.length})`,
       );
       historyParts.push(`System: ${systemPromptContent}`);
     }
@@ -142,7 +145,7 @@ function buildPrompt(
       }
 
       console.log(
-        `[DeepseekWebStream] Message[${messages.indexOf(m)}] role=${m.role} length=${content.length} preview=${content.slice(0, 50).replace(/\n/g, " ")}`,
+        `[DeepseekWebStream] 💬 消息[${messages.indexOf(m)}] 角色=${m.role} 长度=${content.length} 预览=${content.slice(0, 30).replace(/\n/g, " ")}`,
       );
       historyParts.push(`${role}: ${content}`);
     }
@@ -251,7 +254,7 @@ function cleanupOldSessions(): void {
       sessionMap.delete(key);
       parentMessageMap.delete(key);
       sessionTimestampMap.delete(key);
-      console.log(`[DeepseekWebStream] Cleaned up expired session: ${key}`);
+      console.log(`[DeepseekWebStream] 🧹 清理过期会话: ${key}`);
     }
   }
 
@@ -263,7 +266,7 @@ function cleanupOldSessions(): void {
       sessionMap.delete(key);
       parentMessageMap.delete(key);
       sessionTimestampMap.delete(key);
-      console.log(`[DeepseekWebStream] Cleaned up LRU session: ${key}`);
+      console.log(`[DeepseekWebStream] 🧹 清理LRU会话: ${key}`);
     }
   }
 }
@@ -293,6 +296,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
 
         const streamContext = context as unknown as DeepSeekStreamContext;
         const sessionKey = streamContext.sessionId || "default";
+        const runId = streamContext.runId;
         let dsSessionId = sessionMap.get(sessionKey);
         let parentId = parentMessageMap.get(sessionKey);
 
@@ -308,18 +312,18 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         const systemPrompt = streamContext.systemPrompt;
         const tools = streamContext.tools;
         console.log(
-          `[DeepseekWebStream] Context messages count: ${messages.length}, hasSystemPrompt: ${!!systemPrompt}`,
+          `[DeepseekWebStream] 📝 消息数: ${messages.length}, 系统提示: ${systemPrompt ? "有" : "无"}`,
         );
 
         const prompt = buildPrompt(messages, systemPrompt, tools, sessionKey, parentMessageMap);
 
         console.log(
-          `[DeepseekWebStream] Starting run for session: ${sessionKey}. DS session: ${dsSessionId}. Parent: ${parentId}. Prompt length: ${prompt.length}`,
+          `[DeepseekWebStream] 🚀 开始对话 | 会话: ${sessionKey.slice(0, 8)}... | 提示长度: ${prompt.length}`,
         );
-        console.log(`[DeepseekWebStream] Full Prompt Preview: ${prompt.slice(0, 150)}...`);
+        console.log(`[DeepseekWebStream] 📄 提示预览: ${prompt.slice(0, 80)}...`);
 
         if (!prompt) {
-          console.error(`[DeepseekWebStream] No prompt to send:`, JSON.stringify(messages));
+          console.error(`[DeepseekWebStream] ❌ 无可发送的消息:`, JSON.stringify(messages));
           throw new Error("No message found to send to DeepSeek web API");
         }
 
@@ -350,9 +354,28 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         const accumulatedReasoningParts: string[] = [];
         const accumulatedToolCalls: MessageContentPart[] = [];
         let buffer = "";
+        let lastEmittedThinking = "";
 
         const getAccumulatedContent = () => accumulatedContentParts.join("");
         const getAccumulatedReasoning = () => accumulatedReasoningParts.join("");
+
+        const emitThinkingEvent = (text: string, isStart: boolean = false) => {
+          if (!runId) {
+            return;
+          }
+          const prior = lastEmittedThinking ?? "";
+          const delta = text.startsWith(prior) ? text.slice(prior.length) : text;
+          if (!delta && !isStart) {
+            return;
+          }
+          lastEmittedThinking = text;
+          emitAgentEvent({
+            runId,
+            stream: "thinking",
+            data: { text, delta },
+            sessionKey: streamContext.sessionKey,
+          });
+        };
 
         const estimateTokens = (text: string): number => {
           return Math.ceil(Buffer.byteLength(text, "utf8") / 4);
@@ -420,6 +443,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 contentIndex: index,
                 partial: createPartial(),
               });
+              emitThinkingEvent("", true);
             } else if (type === "toolcall") {
               const toolId = forceId || `call_${Date.now()}_${index}`;
               contentParts[index] = {
@@ -463,6 +487,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
               delta,
               partial: createPartial(),
             });
+            emitThinkingEvent(getAccumulatedReasoning());
           } else if (type === "toolcall") {
             accumulatedToolCalls[currentToolIndex].arguments += delta;
             stream.push({
@@ -493,7 +518,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           }
 
           if (JUNK_TOKENS.has(delta)) {
-            console.log(`[DeepseekWebStream] Filtering junk token: ${delta}`);
+            console.log(`[DeepseekWebStream] 🗑️ 过滤垃圾token: ${delta}`);
             return;
           }
 
@@ -605,11 +630,11 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                     try {
                       part.arguments = JSON.parse(argStr);
                     } catch (e) {
-                      console.log(`[DeepseekWebStream] Tool arguments parse error: ${e instanceof Error ? e.message : String(e)}, raw: ${argStr.slice(0, 100)}`);
+                      console.log(`[DeepseekWebStream] ⚠️ 工具参数解析错误: ${e instanceof Error ? e.message : String(e)}, 原始: ${argStr.slice(0, 100)}`);
                       part.arguments = { raw: argStr };
                     }
                     const argsStr = JSON.stringify(part.arguments);
-                    console.log(`\x1b[33m[DeepseekWebStream] Tool call detected: 工具名称: ${part.name}, 参数: ${argsStr.length > 200 ? argsStr.slice(0, 200) + "..." : argsStr}\x1b[0m`);
+                    console.log(`\x1b[33m[DeepseekWebStream] 🔧 工具调用: ${part.name}, 参数: ${argsStr.length > 100 ? argsStr.slice(0, 100) + "..." : argsStr}\x1b[0m`);
                     stream.push({
                       type: "toolcall_end",
                       contentIndex: index,
@@ -739,7 +764,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 }
               }
             } catch (e) {
-              console.log(`[DeepseekWebStream] JSON parse error: ${e instanceof Error ? e.message : String(e)}, data: ${dataStr.slice(0, 200)}`);
+              console.log(`[DeepseekWebStream] ⚠️ JSON解析错误: ${e instanceof Error ? e.message : String(e)}, 数据: ${dataStr.slice(0, 100)}`);
             }
           }
         };
@@ -779,7 +804,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
 
         const totalTokens = inputTokenCount + Math.ceil(outputTokenCount / 4);
         console.log(
-          `[DeepseekWebStream] Stream completed. Content: ${getAccumulatedContent().length}, reasoning: ${getAccumulatedReasoning().length}, toolCalls: ${accumulatedToolCalls.length}, 输入 tokens: ${inputTokenCount}, 输出 tokens: ${Math.ceil(outputTokenCount / 4)}, 总 tokens: ${totalTokens}`,
+          `[DeepseekWebStream] ✅ 对话完成 | 内容: ${getAccumulatedContent().length}字符 | 思考: ${getAccumulatedReasoning().length}字符 | 工具调用: ${accumulatedToolCalls.length} | 输入: ${inputTokenCount} | 输出: ${Math.ceil(outputTokenCount / 4)} | 总计: ${totalTokens}`,
         );
 
         // Filter internal tools from final message as per original logic,
