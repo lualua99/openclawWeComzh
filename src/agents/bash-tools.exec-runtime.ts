@@ -393,12 +393,13 @@ export async function runExecProcess(opts: {
         stdinMode: opts.usePty ? ("pipe-open" as const) : ("pipe-closed" as const),
       };
     }
-    const { shell, args: shellArgs } = getShellConfig();
-    const childArgv = [shell, ...shellArgs, execCommand];
+    const { shell, args: shellArgs, wrapCommand } = getShellConfig();
+    const wrappedCommand = wrapCommand ? wrapCommand(execCommand) : execCommand;
+    const childArgv = [shell, ...shellArgs, wrappedCommand];
     if (opts.usePty) {
       return {
         mode: "pty" as const,
-        ptyCommand: execCommand,
+        ptyCommand: wrappedCommand,
         childFallbackArgv: childArgv,
         env: opts.env,
         stdinMode: "pipe-open" as const,
