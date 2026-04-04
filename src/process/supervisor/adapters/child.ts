@@ -19,6 +19,15 @@ function resolveCommand(command: string): string {
   return command;
 }
 
+function decodeWindowsOutput(chunk: Buffer): string {
+  const asUtf8 = chunk.toString("utf8");
+  if (!asUtf8.includes("\uFFFD")) {
+    return asUtf8;
+  }
+  const asLatin1 = chunk.toString("latin1");
+  return Buffer.from(asLatin1, "latin1").toString("utf8");
+}
+
 export type ChildAdapter = SpawnProcessAdapter<NodeJS.Signals | null>;
 
 export async function createChildAdapter(params: {
@@ -34,10 +43,6 @@ export async function createChildAdapter(params: {
 
   const stdinMode = params.stdinMode ?? (params.input !== undefined ? "pipe-closed" : "inherit");
 
-  // On Windows, `detached: true` creates a new process group and can prevent
-  // stdout/stderr pipes from connecting when running under a Scheduled Task
-  // (headless, no console). Default to `detached: false` on Windows; on
-  // POSIX systems keep `detached: true` so the child survives parent exit.
   const useDetached = process.platform !== "win32";
 
   const options: SpawnOptions = {
@@ -106,13 +111,13 @@ export async function createChildAdapter(params: {
 
   const onStdout = (listener: (chunk: string) => void) => {
     child.stdout.on("data", (chunk) => {
-      listener(chunk.toString());
+      listener(decodeWindowsOutput(chunk));
     });
   };
 
   const onStderr = (listener: (chunk: string) => void) => {
     child.stderr.on("data", (chunk) => {
-      listener(chunk.toString());
+      listener(decodeWindowsOutput(chunk));
     });
   };
 
