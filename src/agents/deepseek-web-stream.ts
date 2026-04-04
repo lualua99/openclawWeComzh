@@ -13,17 +13,45 @@ import {
   type DeepSeekWebClientOptions,
 } from "../providers/deepseek-web-client.js";
 
-interface AgentContextMeta {
-  sessionId?: string;
-  systemPrompt?: string;
-}
-
 interface DeepseekStreamOptions {
   searchEnabled?: boolean;
   preempt?: boolean;
   fileIds?: string[];
   signal?: AbortSignal;
 }
+
+type MessageContentPart = {
+  type: string;
+  text?: string;
+  thinking?: string;
+  name?: string;
+  arguments?: string | Record<string, unknown>;
+  index?: number;
+  id?: string;
+};
+
+interface DeepSeekStreamContext {
+  sessionId: string;
+  systemPrompt: string;
+  messages: Array<{
+    role: string;
+    content: string | MessageContentPart[];
+  }>;
+  tools: Array<{
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  }>;
+}
+
+type ToolResultContentPart = {
+  type: "text";
+  text: string;
+};
+
+type ToolResultMessageWithContent = ToolResultMessage & {
+  content: string | ToolResultContentPart[];
+};
 
 const sessionMap = new Map<string, string>();
 const parentMessageMap = new Map<string, string | number>();
@@ -54,15 +82,103 @@ function extractToolCallAttrs(tag: string): { id: string | null; name: string } 
       id = null;
     }
   }
-  if (!name && id) {
-    name = id;
-  }
-  return {
-    id,
-    name,
-  };
+  return { id, name };
 }
-const JUNK_TOKENS = ["<｜end▁of▁thinking｜>", "<|endoftext|>"];
+
+function buildPrompt(
+  messages: DeepSeekStreamContext["messages"],
+  systemPrompt: string,
+  tools: DeepSeekStreamContext["tools"],
+  sessionId: string,
+  parentMessageMap: Map<string, string | number>,
+): string {
+  const parentId = parentMessageMap.get(sessionId);
+
+  if (!parentId) {
+    const historyParts: string[] = [];
+
+    let systemPromptContent = systemPrompt;
+
+    if (tools.length > 0) {
+      let toolPrompt = DEFAULT_TOOL_INSTRUCTIONS;
+      for (const tool of tools) {
+        toolPrompt += `#### ${tool.name}\n${tool.description}\n`;
+        toolPrompt += `Parameters: ${JSON.stringify(tool.parameters)}\n\n`;
+      }
+      systemPromptContent += toolPrompt;
+    }
+
+    if (systemPromptContent && !messages.some((m) => m.role === "system")) {
+      console.log(
+        `[DeepseekWebStream] Prepending separate systemPrompt (length=${systemPromptContent.length})`,
+      );
+      historyParts.push(`System: ${systemPromptContent}`);
+    }
+
+    for (const m of messages) {
+      const msgRole = m.role;
+      if (msgRole === "toolResult") {
+        continue;
+      }
+      const role = msgRole === "user" ? "User" : "Assistant";
+      let content = "";
+
+      if (Array.isArray(m.content)) {
+        for (const part of m.content) {
+          if (part.type === "text") {
+            content += (part).text;
+          } else if (part.type === "thinking") {
+            content += `<think>\n${(part).thinking}\n
+</think>
+
+\n`;
+          } else if (part.type === "toolCall") {
+            const tc = part;
+            content += `<tool_call id="${tc.id}" name="${tc.name}">${JSON.stringify(tc.arguments)}</tool_call>`;
+          }
+        }
+      } else {
+        content = String(m.content);
+      }
+
+      console.log(
+        `[DeepseekWebStream] Message[${messages.indexOf(m)}] role=${m.role} length=${content.length} preview=${content.slice(0, 50).replace(/\n/g, " ")}`,
+      );
+      historyParts.push(`${role}: ${content}`);
+    }
+
+    return historyParts.join("\n\n");
+  } else {
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === "toolResult") {
+      const tr = lastMsg as ToolResultMessageWithContent;
+      let resultText = "";
+      if (Array.isArray(tr.content)) {
+        for (const part of tr.content) {
+          if (part.type === "text") {
+            resultText += part.text;
+          }
+        }
+      }
+      return `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>\n\nPlease proceed based on this tool result.`;
+    } else {
+      const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
+      if (lastUserMessage) {
+        if (typeof lastUserMessage.content === "string") {
+          return lastUserMessage.content;
+        } else if (Array.isArray(lastUserMessage.content)) {
+          return lastUserMessage.content
+            .filter((part) => part.type === "text")
+            .map((part) => (part as TextContent).text)
+            .join("");
+        }
+      }
+    }
+  }
+  return "";
+}
+
+const JUNK_TOKENS = new Set(["<｜end▁of▁thinking｜>", "<|endoftext|>"]);
 const INTERNAL_TOOLS = new Set(["web_search"]);
 
 const DEFAULT_TOOL_INSTRUCTIONS = `
@@ -141,7 +257,7 @@ function cleanupOldSessions(): void {
 
   if (sessionMap.size > MAX_SESSIONS) {
     const entries = [...sessionTimestampMap.entries()]
-      .sort((a, b) => a[1] - b[1])
+      .toSorted((a, b) => a[1] - b[1])
       .slice(0, sessionMap.size - MAX_SESSIONS);
     for (const [key] of entries) {
       sessionMap.delete(key);
@@ -151,15 +267,6 @@ function cleanupOldSessions(): void {
     }
   }
 }
-
-type MessageContentPart = {
-  type: string;
-  text?: string;
-  name?: string;
-  arguments?: string;
-  index?: number;
-  id?: string;
-};
 
 export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
   let options: string | DeepSeekWebClientOptions;
@@ -184,7 +291,8 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
 
         cleanupOldSessions();
 
-        const sessionKey = (context as unknown as AgentContextMeta).sessionId || "default";
+        const streamContext = context as unknown as DeepSeekStreamContext;
+        const sessionKey = streamContext.sessionId || "default";
         let dsSessionId = sessionMap.get(sessionKey);
         let parentId = parentMessageMap.get(sessionKey);
 
@@ -196,95 +304,14 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         }
         sessionTimestampMap.set(sessionKey, Date.now());
 
-        const messages = context.messages || [];
-        const systemPrompt = (context as unknown as AgentContextMeta).systemPrompt || "";
+        const messages = streamContext.messages;
+        const systemPrompt = streamContext.systemPrompt;
+        const tools = streamContext.tools;
         console.log(
           `[DeepseekWebStream] Context messages count: ${messages.length}, hasSystemPrompt: ${!!systemPrompt}`,
         );
-        let prompt = "";
 
-        if (!parentId) {
-          // First turn or new session: Aggregate all history including System Prompt
-          const historyParts: string[] = [];
-
-          const tools = context.tools || [];
-          let systemPromptContent = systemPrompt;
-
-          if (tools.length > 0) {
-            let toolPrompt = DEFAULT_TOOL_INSTRUCTIONS;
-            for (const tool of tools) {
-              toolPrompt += `#### ${tool.name}\n${tool.description}\n`;
-              toolPrompt += `Parameters: ${JSON.stringify(tool.parameters)}\n\n`;
-            }
-            systemPromptContent += toolPrompt;
-          }
-
-          if (systemPromptContent && !messages.some((m) => (m.role as string) === "system")) {
-            console.log(
-              `[DeepseekWebStream] Prepending separate systemPrompt (length=${systemPromptContent.length})`,
-            );
-            historyParts.push(`System: ${systemPromptContent}`);
-          }
-
-          for (const m of messages) {
-            const msgRole = m.role;
-            if (msgRole === "toolResult") {
-              continue;
-            }
-            const role = msgRole === "user" ? "User" : "Assistant";
-            let content = "";
-
-            if (Array.isArray(m.content)) {
-              for (const part of m.content) {
-                if (part.type === "text") {
-                  content += (part).text;
-                } else if (part.type === "thinking") {
-                  content += `<think>\n${(part).thinking}\n</think>\n`;
-                } else if (part.type === "toolCall") {
-                  const tc = part;
-                  content += `<tool_call id="${tc.id}" name="${tc.name}">${JSON.stringify(tc.arguments)}</tool_call>`;
-                }
-              }
-            } else {
-              content = String(m.content);
-            }
-
-            console.log(
-              `[DeepseekWebStream] Message[${messages.indexOf(m)}] role=${m.role} length=${content.length} preview=${content.slice(0, 50).replace(/\n/g, " ")}`,
-            );
-            historyParts.push(`${role}: ${content}`);
-          }
-
-          prompt = historyParts.join("\n\n");
-        } else {
-          // Continuing turn: Check if the last record is a ToolResult or User message
-          const lastMsg = messages[messages.length - 1];
-          if (lastMsg.role === "toolResult") {
-            const tr = lastMsg as ToolResultMessage;
-            let resultText = "";
-            if (Array.isArray(tr.content)) {
-              for (const part of tr.content) {
-                if (part.type === "text") {
-                  resultText += part.text;
-                }
-              }
-            }
-            prompt = `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>\n\nPlease proceed based on this tool result.`;
-          } else {
-            // Standard user message logic
-            const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
-            if (lastUserMessage) {
-              if (typeof lastUserMessage.content === "string") {
-                prompt = lastUserMessage.content;
-              } else if (Array.isArray(lastUserMessage.content)) {
-                prompt = (lastUserMessage.content as MessageContentPart[])
-                  .filter((part) => part.type === "text")
-                  .map((part) => (part as TextContent).text)
-                  .join("");
-              }
-            }
-          }
-        }
+        const prompt = buildPrompt(messages, systemPrompt, tools, sessionKey, parentMessageMap);
 
         console.log(
           `[DeepseekWebStream] Starting run for session: ${sessionKey}. DS session: ${dsSessionId}. Parent: ${parentId}. Prompt length: ${prompt.length}`,
@@ -296,9 +323,11 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           throw new Error("No message found to send to DeepSeek web API");
         }
 
-        const searchEnabled = (options as DeepseekStreamOptions)?.searchEnabled ?? true;
-        const preempt = (options as DeepseekStreamOptions)?.preempt ?? false;
-        const fileIds = (options as DeepseekStreamOptions)?.fileIds || [];
+        const streamOptions: DeepseekStreamOptions = options ?? {};
+
+        const searchEnabled = streamOptions.searchEnabled ?? true;
+        const preempt = streamOptions.preempt ?? false;
+        const fileIds = streamOptions.fileIds || [];
 
         const responseStream = await client.chatCompletions({
           sessionId: dsSessionId,
@@ -308,7 +337,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           searchEnabled,
           preempt,
           fileIds,
-          signal: options?.signal,
+          signal: streamOptions.signal,
         });
 
         if (!responseStream) {
@@ -317,10 +346,13 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
 
         const reader = responseStream.getReader();
         const decoder = new TextDecoder();
-        let accumulatedContent = "";
-        let accumulatedReasoning = "";
+        const accumulatedContentParts: string[] = [];
+        const accumulatedReasoningParts: string[] = [];
         const accumulatedToolCalls: MessageContentPart[] = [];
         let buffer = "";
+
+        const getAccumulatedContent = () => accumulatedContentParts.join("");
+        const getAccumulatedReasoning = () => accumulatedReasoningParts.join("");
 
         const estimateTokens = (text: string): number => {
           return Math.ceil(Buffer.byteLength(text, "utf8") / 4);
@@ -353,7 +385,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
             timestamp: Date.now(),
           };
           (msg as unknown as { thinking_enabled: boolean }).thinking_enabled =
-            !!accumulatedReasoning;
+            !!getAccumulatedReasoning();
           return msg;
         };
 
@@ -414,7 +446,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           const index = indexMap.get(key)!;
           if (type === "text") {
             (contentParts[index] as TextContent).text += delta;
-            accumulatedContent += delta;
+            accumulatedContentParts.push(delta);
             outputTokenCount += Buffer.byteLength(delta, "utf8");
             stream.push({
               type: "text_delta",
@@ -424,7 +456,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
             });
           } else if (type === "thinking") {
             (contentParts[index] as ThinkingContent).thinking += delta;
-            accumulatedReasoning += delta;
+            accumulatedReasoningParts.push(delta);
             stream.push({
               type: "thinking_delta",
               contentIndex: index,
@@ -460,7 +492,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
             return;
           }
 
-          if (JUNK_TOKENS.includes(delta)) {
+          if (JUNK_TOKENS.has(delta)) {
             console.log(`[DeepseekWebStream] Filtering junk token: ${delta}`);
             return;
           }
@@ -568,7 +600,8 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                   const index = indexMap.get(key);
                   if (index !== undefined) {
                     const part = contentParts[index] as ToolCall;
-                    const argStr = accumulatedToolCalls[currentToolIndex].arguments || "{}";
+                    const argData = accumulatedToolCalls[currentToolIndex].arguments;
+                    const argStr = typeof argData === "string" ? argData : JSON.stringify(argData);
                     try {
                       part.arguments = JSON.parse(argStr);
                     } catch (e) {
@@ -746,7 +779,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
 
         const totalTokens = inputTokenCount + Math.ceil(outputTokenCount / 4);
         console.log(
-          `[DeepseekWebStream] Stream completed. Content: ${accumulatedContent.length}, reasoning: ${accumulatedReasoning.length}, toolCalls: ${accumulatedToolCalls.length}, 输入 tokens: ${inputTokenCount}, 输出 tokens: ${Math.ceil(outputTokenCount / 4)}, 总 tokens: ${totalTokens}`,
+          `[DeepseekWebStream] Stream completed. Content: ${getAccumulatedContent().length}, reasoning: ${getAccumulatedReasoning().length}, toolCalls: ${accumulatedToolCalls.length}, 输入 tokens: ${inputTokenCount}, 输出 tokens: ${Math.ceil(outputTokenCount / 4)}, 总 tokens: ${totalTokens}`,
         );
 
         // Filter internal tools from final message as per original logic,
@@ -783,7 +816,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           timestamp: Date.now(),
         };
         (assistantMessage as unknown as { thinking_enabled: boolean }).thinking_enabled =
-          !!accumulatedReasoning;
+          !!getAccumulatedReasoning();
 
         stream.push({
           type: "done",
