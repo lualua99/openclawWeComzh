@@ -13,6 +13,18 @@ import {
   type DeepSeekWebClientOptions,
 } from "../providers/deepseek-web-client.js";
 
+interface AgentContextMeta {
+  sessionId?: string;
+  systemPrompt?: string;
+}
+
+interface DeepseekStreamOptions {
+  searchEnabled?: boolean;
+  preempt?: boolean;
+  fileIds?: string[];
+  signal?: AbortSignal;
+}
+
 const sessionMap = new Map<string, string>();
 const parentMessageMap = new Map<string, string | number>();
 const sessionTimestampMap = new Map<string, number>();
@@ -172,7 +184,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
 
         cleanupOldSessions();
 
-        const sessionKey = (context as unknown as { sessionId?: string }).sessionId || "default";
+        const sessionKey = (context as unknown as AgentContextMeta).sessionId || "default";
         let dsSessionId = sessionMap.get(sessionKey);
         let parentId = parentMessageMap.get(sessionKey);
 
@@ -185,7 +197,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         sessionTimestampMap.set(sessionKey, Date.now());
 
         const messages = context.messages || [];
-        const systemPrompt = (context as unknown as { systemPrompt?: string }).systemPrompt || "";
+        const systemPrompt = (context as unknown as AgentContextMeta).systemPrompt || "";
         console.log(
           `[DeepseekWebStream] Context messages count: ${messages.length}, hasSystemPrompt: ${!!systemPrompt}`,
         );
@@ -246,9 +258,9 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           prompt = historyParts.join("\n\n");
         } else {
           // Continuing turn: Check if the last record is a ToolResult or User message
-          const lastMsg = messages[messages.length - 1] as unknown as { role: string; toolCallId?: string; toolName?: string; content: unknown };
+          const lastMsg = messages[messages.length - 1];
           if (lastMsg.role === "toolResult") {
-            const tr = lastMsg as unknown as ToolResultMessage;
+            const tr = lastMsg as ToolResultMessage;
             let resultText = "";
             if (Array.isArray(tr.content)) {
               for (const part of tr.content) {
@@ -284,10 +296,9 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           throw new Error("No message found to send to DeepSeek web API");
         }
 
-        const searchEnabled =
-          (options as unknown as { searchEnabled?: boolean })?.searchEnabled ?? true;
-        const preempt = (options as unknown as { preempt?: boolean })?.preempt ?? false;
-        const fileIds = (options as unknown as { fileIds?: string[] })?.fileIds || [];
+        const searchEnabled = (options as DeepseekStreamOptions)?.searchEnabled ?? true;
+        const preempt = (options as DeepseekStreamOptions)?.preempt ?? false;
+        const fileIds = (options as DeepseekStreamOptions)?.fileIds || [];
 
         const responseStream = await client.chatCompletions({
           sessionId: dsSessionId,
