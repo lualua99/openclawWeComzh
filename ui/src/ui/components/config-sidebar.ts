@@ -1,5 +1,6 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { t } from "../../i18n/index.ts";
 
 export const TAG_SEARCH_PRESETS = [
   "security",
@@ -303,7 +304,7 @@ export class ConfigSidebar extends LitElement {
     return html`
       <aside class="config-sidebar">
         <div class="config-sidebar__header">
-          <div class="config-sidebar__title">Settings</div>
+          <div class="config-sidebar__title">${t("common.settings")}</div>
           <span
             class="pill pill--sm ${
               this.validity === "valid"
@@ -349,13 +350,13 @@ export class ConfigSidebar extends LitElement {
             }
           </div>
           <div class="config-search__hint">
-            <span class="config-search__hint-label" id="config-tag-filter-label">Tag filters:</span>
+            <span class="config-search__hint-label" id="config-tag-filter-label">${t("config.tagFilters")}:</span>
             <details class="config-search__tag-picker">
               <summary class="config-search__tag-trigger" aria-labelledby="config-tag-filter-label">
                 ${
                   this.selectedTags.size === 0
                     ? html`
-                        <span class="config-search__tag-placeholder">Add tags</span>
+                        <span class="config-search__tag-placeholder">${t("config.addTags")}</span>
                       `
                     : html`
                         <div class="config-search__tag-chips">
@@ -411,7 +412,7 @@ export class ConfigSidebar extends LitElement {
             @click=${() => this.dispatchSection(null)}
           >
             <span class="config-nav__icon">${sidebarIcons.all}</span>
-            <span class="config-nav__label">All Settings</span>
+            <span class="config-nav__label">${t("config.allSettings")}</span>
           </button>
           ${this.allSections.map(
             (section) => html`

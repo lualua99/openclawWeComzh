@@ -515,6 +515,17 @@ export async function agentCommand(
             }
             // Handle thinking_delta events from pi-embedded-subscribe (e.g., deepseek-web-stream)
             const eventAny = event as unknown as { type?: string; delta?: string; text?: string; stream?: string };
+            if (eventAny.type === "thinking_start") {
+              emitAgentEvent({
+                runId,
+                stream: "thinking",
+                data: {
+                  text: "",
+                  delta: "",
+                },
+              });
+              return;
+            }
             if (eventAny.type === "thinking_delta") {
               const thinking = eventAny.delta;
               if (thinking) {

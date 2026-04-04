@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { SkillStatusEntry } from "../types.ts";
+import { t } from "../../i18n/index.ts";
 
 export function computeSkillMissing(skill: SkillStatusEntry): string[] {
   return [
@@ -33,7 +34,7 @@ export function renderSkillStatusChips(params: {
       ${
         showBundledBadge
           ? html`
-              <span class="chip">bundled</span>
+              <span class="chip">${t("skills.bundled")}</span>
             `
           : nothing
       }
@@ -43,7 +44,7 @@ export function renderSkillStatusChips(params: {
       ${
         skill.disabled
           ? html`
-              <span class="chip chip-warn">disabled</span>
+              <span class="chip chip-warn">${t("skills.disabled")}</span>
             `
           : nothing
       }

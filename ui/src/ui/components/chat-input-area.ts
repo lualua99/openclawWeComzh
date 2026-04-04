@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { icons } from "../icons.ts";
 import { detectTextDirection } from "../text-direction.ts";
+import { t } from "../../i18n/index.ts";
 import type { ChatAttachment } from "../ui-types.ts";
 
 @customElement("chat-input-area")
@@ -261,7 +262,7 @@ export class ChatInputArea extends LitElement {
 
         <div class="chat-compose__row">
           <label class="field chat-compose__field">
-            <span>Message</span>
+            <span>${t("chat.message")}</span>
             <textarea
               .value=${this.draft}
               dir=${detectTextDirection(this.draft)}

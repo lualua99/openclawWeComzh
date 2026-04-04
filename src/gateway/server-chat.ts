@@ -326,17 +326,17 @@ export function createAgentEventHandler({
     sourceRunId: string,
     seq: number,
     thinking: string,
+    isStart: boolean = false,
   ) => {
-    if (!thinking) {
-      return;
-    }
     if (shouldHideHeartbeatChatOutput(clientRunId, sourceRunId)) {
       return;
     }
     const now = Date.now();
-    const last = chatRunState.thinkingDeltaSentAt.get(clientRunId) ?? 0;
-    if (now - last < 50) {
-      return;
+    if (!isStart) {
+      const last = chatRunState.thinkingDeltaSentAt.get(clientRunId) ?? 0;
+      if (now - last < 50) {
+        return;
+      }
     }
     chatRunState.thinkingDeltaSentAt.set(clientRunId, now);
     const payload = {
@@ -495,7 +495,8 @@ export function createAgentEventHandler({
       if (!isAborted && evt.stream === "assistant" && typeof evt.data?.text === "string") {
         emitChatDelta(sessionKey, clientRunId, evt.runId, evt.seq, evt.data.text);
       } else if (!isAborted && evt.stream === "thinking" && typeof evt.data?.text === "string") {
-        emitThinkingDelta(sessionKey, clientRunId, evt.runId, evt.seq, evt.data.text);
+        const isStart = evt.data.text === "" && evt.data.delta === "";
+        emitThinkingDelta(sessionKey, clientRunId, evt.runId, evt.seq, evt.data.text, isStart);
       } else if (!isAborted && (lifecyclePhase === "end" || lifecyclePhase === "error")) {
         if (chatLink) {
           const finished = chatRunState.registry.shift(evt.runId);
