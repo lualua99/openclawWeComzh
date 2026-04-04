@@ -194,24 +194,14 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           }
 
           for (const m of messages) {
-            if (m.role === "toolResult") {
+            const msgRole = m.role;
+            if (msgRole === "toolResult") {
               continue;
             }
-            const role = m.role === "user" ? "User" : "Assistant";
+            const role = msgRole === "user" ? "User" : "Assistant";
             let content = "";
 
-            if (m.role === "toolResult") {
-              const tr = m as unknown as ToolResultMessage;
-              let resultText = "";
-              if (Array.isArray(tr.content)) {
-                for (const part of tr.content) {
-                  if (part.type === "text") {
-                    resultText += part.text;
-                  }
-                }
-              }
-              content = `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>\n`;
-            } else if (Array.isArray(m.content)) {
+            if (Array.isArray(m.content)) {
               for (const part of m.content) {
                 if (part.type === "text") {
                   content += (part).text;
@@ -235,7 +225,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           prompt = historyParts.join("\n\n");
         } else {
           // Continuing turn: Check if the last record is a ToolResult or User message
-          const lastMsg = messages[messages.length - 1];
+          const lastMsg = messages[messages.length - 1] as unknown as { role: string; toolCallId?: string; toolName?: string; content: unknown };
           if (lastMsg.role === "toolResult") {
             const tr = lastMsg as unknown as ToolResultMessage;
             let resultText = "";
@@ -539,7 +529,8 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                     console.log(`[DeepseekWebStream] Tool arguments parse error: ${e instanceof Error ? e.message : String(e)}, raw: ${argStr.slice(0, 100)}`);
                     part.arguments = { raw: argStr };
                   }
-                  console.log(`[DeepseekWebStream] Tool call detected: 工具名称: ${part.name}, 参数: ${JSON.stringify(part.arguments).slice(0, 100)}`);
+                  const argsStr = JSON.stringify(part.arguments);
+                  console.log(`\x1b[33m[DeepseekWebStream] Tool call detected: 工具名称: ${part.name}, 参数: ${argsStr.length > 200 ? argsStr.slice(0, 200) + "..." : argsStr}\x1b[0m`);
                   stream.push({
                     type: "toolcall_end",
                     contentIndex: index,
