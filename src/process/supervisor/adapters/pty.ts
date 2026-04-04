@@ -4,6 +4,15 @@ import { toStringEnv } from "./env.js";
 
 const FORCE_KILL_WAIT_FALLBACK_MS = 4000;
 
+function decodeWindowsOutput(chunk: Buffer): string {
+  const asUtf8 = chunk.toString("utf8");
+  if (!asUtf8.includes("\uFFFD")) {
+    return asUtf8;
+  }
+  const asLatin1 = chunk.toString("latin1");
+  return Buffer.from(asLatin1, "latin1").toString("utf8");
+}
+
 type PtyExitEvent = { exitCode: number; signal?: number };
 type PtyDisposable = { dispose: () => void };
 type PtySpawnHandle = {
@@ -126,7 +135,18 @@ export async function createPtyAdapter(params: {
   const onStdout = (listener: (chunk: string) => void) => {
     dataListener =
       pty.onData((chunk) => {
-        listener(chunk.toString());
+        if (typeof chunk === "string") {
+          const asUtf8 = chunk;
+          if (!asUtf8.includes("\uFFFD")) {
+            listener(asUtf8);
+            return;
+          }
+          const asLatin1 = chunk;
+          listener(Buffer.from(asLatin1, "latin1").toString("utf8"));
+        } else {
+          const decoded = decodeWindowsOutput(chunk);
+          listener(decoded);
+        }
       }) ?? null;
   };
 
