@@ -39,11 +39,14 @@ export function resolvePowerShellPath(): string {
   return "powershell.exe";
 }
 
-export function getShellConfig(): { shell: string; args: string[] } {
+export function getShellConfig(): { shell: string; args: string[]; wrapCommand?: (cmd: string) => string } {
   if (process.platform === "win32") {
     return {
       shell: resolvePowerShellPath(),
       args: ["-NoProfile", "-NonInteractive", "-Command"],
+      wrapCommand: (cmd: string) => {
+        return `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8; chcp 65001 > $null; ${cmd}`;
+      },
     };
   }
 
