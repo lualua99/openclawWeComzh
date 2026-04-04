@@ -41,11 +41,6 @@ export function resolvePowerShellPath(): string {
 
 export function getShellConfig(): { shell: string; args: string[] } {
   if (process.platform === "win32") {
-    // Use PowerShell instead of cmd.exe on Windows.
-    // Problem: Many Windows system utilities (ipconfig, systeminfo, etc.) write
-    // directly to the console via WriteConsole API, bypassing stdout pipes.
-    // When Node.js spawns cmd.exe with piped stdio, these utilities produce no output.
-    // PowerShell properly captures and redirects their output to stdout.
     return {
       shell: resolvePowerShellPath(),
       args: ["-NoProfile", "-NonInteractive", "-Command"],
