@@ -124,7 +124,6 @@ export class DeepSeekWebClient {
   }
 
   async createPowChallenge(targetPath: string): Promise<DeepSeekPowChallenge> {
-    console.log(`[DeepSeekWebClient] Creating PoW challenge for ${targetPath}...`);
     const res = await fetch("https://chat.deepseek.com/api/v0/chat/create_pow_challenge", {
       method: "POST",
       headers: await this.fetchHeaders(),
@@ -140,7 +139,6 @@ export class DeepSeekWebClient {
     }
 
     const data = (await res.json()) as DeepSeekPowResponse;
-    console.log(`[DeepSeekWebClient] PoW data full-log:`, JSON.stringify(data));
 
     const challenge = data.data?.biz_data?.challenge || data.data?.challenge || data.challenge;
     if (!challenge) {
@@ -151,7 +149,6 @@ export class DeepSeekWebClient {
       throw new Error(`PoW challenge missing in response`);
     }
 
-    console.log(`[DeepSeekWebClient] Challenge extracted successfully:`, challenge);
     return challenge;
   }
 
@@ -171,7 +168,6 @@ export class DeepSeekWebClient {
 
   async solvePow(challenge: DeepSeekPowChallenge): Promise<number> {
     const { algorithm, challenge: target, salt, difficulty, expire_at } = challenge;
-    console.log(`[DeepSeekWebClient] Solving PoW (${algorithm}, difficulty: ${difficulty})...`);
 
     if (algorithm === "sha256") {
       const start = Date.now();
@@ -191,9 +187,6 @@ export class DeepSeekWebClient {
         }
         const targetDifficulty = difficulty > 1000 ? Math.floor(Math.log2(difficulty)) : difficulty;
         if (zeroBits >= targetDifficulty) {
-          console.log(
-            `[DeepSeekWebClient] SHA256 PoW solved in ${Date.now() - start}ms, nonce: ${nonce}`,
-          );
           return nonce;
         }
         nonce++;
@@ -237,9 +230,6 @@ export class DeepSeekWebClient {
       if (status === 0) {
         throw new Error("DeepSeekHashV1 failed to find solution");
       }
-      console.log(
-        `[DeepSeekWebClient] DeepSeekHashV1 solved in ${end - start}ms, answer: ${answer}`,
-      );
       return answer;
     }
 
@@ -263,7 +253,6 @@ export class DeepSeekWebClient {
 
     const data = (await res.json()) as DeepSeekChatSessionResponse;
     const sessionId = data.data?.biz_data?.id || data.data?.biz_data?.chat_session_id || "";
-    console.log(`[DeepSeekWebClient] Chat session created: ${sessionId}`);
     return {
       biz_id: data.data?.biz_data?.biz_id || "",
       title: data.data?.biz_data?.title || "",
@@ -293,9 +282,6 @@ export class DeepSeekWebClient {
       }),
     ).toString("base64");
 
-    console.log(
-      `[DeepSeekWebClient] Sending chat completion request (session: ${params.sessionId})...`,
-    );
     const res = await fetch(`https://chat.deepseek.com${targetPath}`, {
       method: "POST",
       headers: {
@@ -322,9 +308,6 @@ export class DeepSeekWebClient {
       throw new Error(`Chat completion failed: ${res.status} ${errorText}`);
     }
 
-    console.log(
-      `[DeepSeekWebClient] Chat completion response OK (status: ${res.status}). Content-Type: ${res.headers.get("content-type")}`,
-    );
     return res.body;
   }
 
