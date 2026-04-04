@@ -25,10 +25,19 @@ const REGEX_THINK_START = /<(?:think(?:ing)?|thought)\b[^<>]*>/i;
 const REGEX_THINK_END = /<\/(?:think(?:ing)?|thought)\b[^<>]*>/i;
 const REGEX_FINAL_START = /<final\b[^<>]*>/i;
 const REGEX_FINAL_END = /<\/final\b[^<>]*>/i;
-const REGEX_TOOL_CALL_START = /<tool_call\s+(?:id=['"]?([^'"]+)['"]?\s+)?name=['"]?([^'"]+)['"]?\s*>/i;
+const REGEX_TOOL_CALL_START = /<tool_call(?:\s+[^>]*)?>/i;
 const REGEX_TOOL_CALL_END = /<\/tool_call\b[^<>]*>/i;
 const REGEX_REPLY = /\[\[reply_to_current\]\]/i;
 const REGEX_MALFORMED_THINK = /\n?think\s*>/i;
+
+function extractToolCallAttrs(tag: string): { id: string | null; name: string } {
+  const idMatch = tag.match(/\bid\s*=\s*['"]?([^'"'\s]+)['"]?/i);
+  const nameMatch = tag.match(/\bname\s*=\s*['"]?([^'"'\s]+)['"]?/i);
+  return {
+    id: idMatch ? idMatch[1] : null,
+    name: nameMatch ? nameMatch[1] : "",
+  };
+}
 const JUNK_TOKENS = ["<｜end▁of▁thinking｜>", "<|endoftext|>"];
 const INTERNAL_TOOLS = new Set(["web_search"]);
 
@@ -472,8 +481,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 type: "tool_call_start",
                 idx: toolCallStartMatch ? toolCallStartMatch.index! : -1,
                 len: toolCallStartMatch ? toolCallStartMatch[0].length : 0,
-                id: toolCallStartMatch ? toolCallStartMatch[1] : null,
-                name: toolCallStartMatch ? toolCallStartMatch[2] : "",
+                ...extractToolCallAttrs(toolCallStartMatch ? toolCallStartMatch[0] : ""),
               },
               {
                 type: "tool_call_end",
@@ -513,9 +521,10 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
               } else if (first.type === "reply_marker") {
                 currentMode = "text";
               } else if (first.type === "tool_call_start") {
+                const attrs = first as { id?: string | null; name?: string };
                 currentMode = "tool_call";
-                currentToolName = first.name!;
-                const toolId = first.id || `call_${Date.now()}_${currentToolIndex}`;
+                currentToolName = attrs.name || "";
+                const toolId = attrs.id || `call_${Date.now()}_${currentToolIndex}`;
                 emitDelta("toolcall", "", toolId);
               } else if (first.type === "tool_call_end") {
                 const key = `tool_${currentToolIndex}`;
