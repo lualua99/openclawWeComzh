@@ -513,22 +513,52 @@ export async function agentCommand(
               stopReason = event.stopReason;
               return;
             }
-            if (event.type !== "text_delta") {
+            // Handle thinking_delta events from pi-embedded-subscribe (e.g., deepseek-web-stream)
+            const eventAny = event as unknown as { type?: string; delta?: string; text?: string; stream?: string };
+            if (eventAny.type === "thinking_delta") {
+              const thinking = eventAny.delta;
+              if (thinking) {
+                emitAgentEvent({
+                  runId,
+                  stream: "thinking",
+                  data: {
+                    text: thinking,
+                    delta: thinking,
+                  },
+                });
+              }
               return;
             }
-            if (event.stream && event.stream !== "output") {
+            if (eventAny.type === "text_delta" && eventAny.stream === "thought") {
+              const thinking = eventAny.text;
+              if (thinking) {
+                emitAgentEvent({
+                  runId,
+                  stream: "thinking",
+                  data: {
+                    text: thinking,
+                    delta: thinking,
+                  },
+                });
+              }
               return;
             }
-            if (!event.text) {
+            if (eventAny.type !== "text_delta") {
               return;
             }
-            streamedText += event.text;
+            if (eventAny.stream && eventAny.stream !== "output") {
+              return;
+            }
+            if (!eventAny.text) {
+              return;
+            }
+            streamedText += eventAny.text;
             emitAgentEvent({
               runId,
               stream: "assistant",
               data: {
                 text: streamedText,
-                delta: event.text,
+                delta: eventAny.text,
               },
             });
           },

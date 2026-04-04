@@ -362,6 +362,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         let currentToolName = "";
         let currentToolIndex = 0;
         let tagBuffer = "";
+        let skippingInternalTool = false;
 
         const emitDelta = (
           type: "text" | "thinking" | "toolcall",
@@ -442,6 +443,9 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         };
 
         const emitDeltaByMode = (delta: string) => {
+          if (skippingInternalTool) {
+            return;
+          }
           if (currentMode === "thinking") {
             emitDelta("thinking", delta);
           } else if (currentMode === "tool_call") {
@@ -545,34 +549,45 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 currentMode = "text";
               } else if (first.type === "tool_call_start") {
                 const attrs = first as { id?: string | null; name?: string };
-                currentMode = "tool_call";
-                currentToolName = attrs.name || "";
-                const toolId = attrs.id || `call_${Date.now()}_${currentToolIndex}`;
-                emitDelta("toolcall", "", toolId);
-              } else if (first.type === "tool_call_end") {
-                const key = `tool_${currentToolIndex}`;
-                const index = indexMap.get(key);
-                if (index !== undefined) {
-                  const part = contentParts[index] as ToolCall;
-                  const argStr = accumulatedToolCalls[currentToolIndex].arguments || "{}";
-                  try {
-                    part.arguments = JSON.parse(argStr);
-                  } catch (e) {
-                    console.log(`[DeepseekWebStream] Tool arguments parse error: ${e instanceof Error ? e.message : String(e)}, raw: ${argStr.slice(0, 100)}`);
-                    part.arguments = { raw: argStr };
-                  }
-                  const argsStr = JSON.stringify(part.arguments);
-                  console.log(`\x1b[33m[DeepseekWebStream] Tool call detected: 工具名称: ${part.name}, 参数: ${argsStr.length > 200 ? argsStr.slice(0, 200) + "..." : argsStr}\x1b[0m`);
-                  stream.push({
-                    type: "toolcall_end",
-                    contentIndex: index,
-                    toolCall: part,
-                    partial: createPartial(),
-                  });
+                const toolName = attrs.name || "";
+                if (INTERNAL_TOOLS.has(toolName)) {
+                  skippingInternalTool = true;
+                  currentMode = "text";
+                } else {
+                  currentMode = "tool_call";
+                  currentToolName = toolName;
+                  const toolId = attrs.id || `call_${Date.now()}_${currentToolIndex}`;
+                  emitDelta("toolcall", "", toolId);
                 }
-                currentMode = "text";
-                currentToolIndex++;
-                currentToolName = "";
+              } else if (first.type === "tool_call_end") {
+                if (skippingInternalTool) {
+                  skippingInternalTool = false;
+                  currentMode = "text";
+                } else {
+                  const key = `tool_${currentToolIndex}`;
+                  const index = indexMap.get(key);
+                  if (index !== undefined) {
+                    const part = contentParts[index] as ToolCall;
+                    const argStr = accumulatedToolCalls[currentToolIndex].arguments || "{}";
+                    try {
+                      part.arguments = JSON.parse(argStr);
+                    } catch (e) {
+                      console.log(`[DeepseekWebStream] Tool arguments parse error: ${e instanceof Error ? e.message : String(e)}, raw: ${argStr.slice(0, 100)}`);
+                      part.arguments = { raw: argStr };
+                    }
+                    const argsStr = JSON.stringify(part.arguments);
+                    console.log(`\x1b[33m[DeepseekWebStream] Tool call detected: 工具名称: ${part.name}, 参数: ${argsStr.length > 200 ? argsStr.slice(0, 200) + "..." : argsStr}\x1b[0m`);
+                    stream.push({
+                      type: "toolcall_end",
+                      contentIndex: index,
+                      toolCall: part,
+                      partial: createPartial(),
+                    });
+                  }
+                  currentMode = "text";
+                  currentToolIndex++;
+                  currentToolName = "";
+                }
               }
 
               tagBuffer = tagBuffer.slice(first.idx + first.len);

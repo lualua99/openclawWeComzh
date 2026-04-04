@@ -144,6 +144,7 @@ export type ChatRunState = {
   registry: ChatRunRegistry;
   buffers: Map<string, string>;
   deltaSentAt: Map<string, number>;
+  thinkingDeltaSentAt: Map<string, number>;
   abortedRuns: Map<string, number>;
   clear: () => void;
 };
@@ -152,12 +153,14 @@ export function createChatRunState(): ChatRunState {
   const registry = createChatRunRegistry();
   const buffers = new Map<string, string>();
   const deltaSentAt = new Map<string, number>();
+  const thinkingDeltaSentAt = new Map<string, number>();
   const abortedRuns = new Map<string, number>();
 
   const clear = () => {
     registry.clear();
     buffers.clear();
     deltaSentAt.clear();
+    thinkingDeltaSentAt.clear();
     abortedRuns.clear();
   };
 
@@ -165,6 +168,7 @@ export function createChatRunState(): ChatRunState {
     registry,
     buffers,
     deltaSentAt,
+    thinkingDeltaSentAt,
     abortedRuns,
     clear,
   };
@@ -297,7 +301,7 @@ export function createAgentEventHandler({
     }
     const now = Date.now();
     const last = chatRunState.deltaSentAt.get(clientRunId) ?? 0;
-    if (now - last < 150) {
+    if (now - last < 50) {
       return;
     }
     chatRunState.deltaSentAt.set(clientRunId, now);
@@ -309,6 +313,40 @@ export function createAgentEventHandler({
       message: {
         role: "assistant",
         content: [{ type: "text", text: cleaned }],
+        timestamp: now,
+      },
+    };
+    broadcast("chat", payload, { dropIfSlow: true });
+    nodeSendToSession(sessionKey, "chat", payload);
+  };
+
+  const emitThinkingDelta = (
+    sessionKey: string,
+    clientRunId: string,
+    sourceRunId: string,
+    seq: number,
+    thinking: string,
+  ) => {
+    if (!thinking) {
+      return;
+    }
+    if (shouldHideHeartbeatChatOutput(clientRunId, sourceRunId)) {
+      return;
+    }
+    const now = Date.now();
+    const last = chatRunState.thinkingDeltaSentAt.get(clientRunId) ?? 0;
+    if (now - last < 50) {
+      return;
+    }
+    chatRunState.thinkingDeltaSentAt.set(clientRunId, now);
+    const payload = {
+      runId: clientRunId,
+      sessionKey,
+      seq,
+      state: "delta" as const,
+      message: {
+        role: "assistant",
+        content: [{ type: "thinking", thinking }],
         timestamp: now,
       },
     };
@@ -337,6 +375,7 @@ export function createAgentEventHandler({
       normalizedHeartbeatText.suppress || isSilentReplyText(text, SILENT_REPLY_TOKEN);
     chatRunState.buffers.delete(clientRunId);
     chatRunState.deltaSentAt.delete(clientRunId);
+    chatRunState.thinkingDeltaSentAt.delete(clientRunId);
     if (jobState === "done") {
       const payload = {
         runId: clientRunId,
@@ -455,6 +494,8 @@ export function createAgentEventHandler({
       }
       if (!isAborted && evt.stream === "assistant" && typeof evt.data?.text === "string") {
         emitChatDelta(sessionKey, clientRunId, evt.runId, evt.seq, evt.data.text);
+      } else if (!isAborted && evt.stream === "thinking" && typeof evt.data?.text === "string") {
+        emitThinkingDelta(sessionKey, clientRunId, evt.runId, evt.seq, evt.data.text);
       } else if (!isAborted && (lifecyclePhase === "end" || lifecyclePhase === "error")) {
         if (chatLink) {
           const finished = chatRunState.registry.shift(evt.runId);
@@ -485,6 +526,7 @@ export function createAgentEventHandler({
         chatRunState.abortedRuns.delete(evt.runId);
         chatRunState.buffers.delete(clientRunId);
         chatRunState.deltaSentAt.delete(clientRunId);
+        chatRunState.thinkingDeltaSentAt.delete(clientRunId);
         if (chatLink) {
           chatRunState.registry.remove(evt.runId, clientRunId, sessionKey);
         }
