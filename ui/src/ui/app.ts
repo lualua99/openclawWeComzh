@@ -35,6 +35,7 @@ import {
   handleLogsScroll as handleLogsScrollInternal,
   resetChatScroll as resetChatScrollInternal,
   scheduleChatScroll as scheduleChatScrollInternal,
+  scrollRestoration,
 } from "./app-scroll.ts";
 import {
   applySettings as applySettingsInternal,
@@ -119,6 +120,9 @@ export class OpenClawApp extends LitElement {
     super();
     if (isSupportedLocale(this.settings.locale)) {
       void i18n.setLocale(this.settings.locale);
+    }
+    if (typeof history !== "undefined") {
+      history.scrollRestoration = "manual";
     }
   }
   @state() password = "";
@@ -424,13 +428,49 @@ export class OpenClawApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
+    scrollRestoration.init(this as unknown as HTMLElement);
+    this.setupScrollRestorationEvents();
+    const container = this.querySelector(".chat-thread") as HTMLElement | null;
+    if (container) {
+      scrollRestoration.attachScrollListener(container);
+      scrollRestoration.restoreAfterRender(container);
+    } else {
+      scrollRestoration.tryRestoreWithContainer(this as unknown as HTMLElement);
+    }
   }
+
+  private setupScrollRestorationEvents(): void {
+    window.addEventListener("beforeunload", this.handleBeforeUnload);
+    document.addEventListener("visibilitychange", this.handleVisibilityChange);
+  }
+
+  private handleBeforeUnload = () => {
+    const container = this.querySelector(".chat-thread") as HTMLElement | null;
+    if (container) {
+      scrollRestoration.saveImmediate(container);
+    }
+  };
+
+  private handleVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      const container = this.querySelector(".chat-thread") as HTMLElement | null;
+      if (container) {
+        scrollRestoration.saveImmediate(container);
+      }
+    }
+  };
 
   protected firstUpdated() {
     handleFirstUpdated(this as unknown as Parameters<typeof handleFirstUpdated>[0]);
   }
 
   disconnectedCallback() {
+    const container = this.querySelector(".chat-thread") as HTMLElement | null;
+    if (container) {
+      scrollRestoration.saveImmediate(container);
+    }
+    window.removeEventListener("beforeunload", this.handleBeforeUnload);
+    document.removeEventListener("visibilitychange", this.handleVisibilityChange);
     handleDisconnected(this as unknown as Parameters<typeof handleDisconnected>[0]);
     super.disconnectedCallback();
   }
@@ -448,6 +488,10 @@ export class OpenClawApp extends LitElement {
       this as unknown as Parameters<typeof handleChatScrollInternal>[0],
       event,
     );
+    const container = event.currentTarget as HTMLElement | null;
+    if (container) {
+      scrollRestoration.save(container);
+    }
   }
 
   handleLogsScroll(event: Event) {

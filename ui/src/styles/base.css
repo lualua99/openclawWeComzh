@@ -146,6 +146,13 @@
   --md-sys-color-surface-3: #eeeff9;
   --md-sys-color-surface-4: #ecedf7;
   --md-sys-color-surface-5: #e8eaf4;
+
+  /* Material You Surface Container */
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f8f7fc;
+  --md-sys-color-surface-container: #efeef6;
+  --md-sys-color-surface-container-high: #e9e8f0;
+  --md-sys-color-surface-container-highest: #e2e1ea;
 }
 
 /* Dark theme */
@@ -257,6 +264,13 @@
   --md-sys-color-surface-3: #27282c;
   --md-sys-color-surface-4: #292a2e;
   --md-sys-color-surface-5: #2d2e33;
+
+  /* Material You Surface Container */
+  --md-sys-color-surface-container-lowest: #1a1b1f;
+  --md-sys-color-surface-container-low: #22232a;
+  --md-sys-color-surface-container: #2a2b33;
+  --md-sys-color-surface-container-high: #35363f;
+  --md-sys-color-surface-container-highest: #3e3f48;
 }
 
 * {
@@ -306,6 +320,7 @@ html.theme-transition::view-transition-new(theme) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   html.theme-transition::view-transition-old(theme),
   html.theme-transition::view-transition-new(theme) {
     animation: none !important;
@@ -343,8 +358,8 @@ select {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -352,12 +367,14 @@ select {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-hover) 100%);
   border-radius: var(--radius-full);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
+  background: linear-gradient(180deg, var(--accent-hover) 0%, var(--accent) 100%);
+  transform: scale(1.1);
 }
 
 /* Animations - Polished with spring feel */
@@ -407,6 +424,30 @@ select {
   }
 }
 
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes view-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -418,6 +459,7 @@ select {
 }
 
 @keyframes pulse-subtle {
+
   0%,
   100% {
     opacity: 1;
@@ -429,6 +471,7 @@ select {
 }
 
 @keyframes glow-pulse {
+
   0%,
   100% {
     box-shadow: 0 0 0 rgba(255, 92, 92, 0);

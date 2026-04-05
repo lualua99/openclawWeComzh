@@ -100,7 +100,7 @@ export function renderStreamingGroup(
           onOpenSidebar,
         )}
         <div class="chat-group-footer">
-          <span class="chat-sender-name">${name}</span>
+          <span class="chat-sender-name">🤖 ${name}</span>
           <span class="chat-group-timestamp">${timestamp}</span>
         </div>
       </div>
@@ -121,9 +121,9 @@ export function renderMessageGroup(
   const assistantName = opts.assistantName ?? "Assistant";
   const who =
     normalizedRole === "user"
-      ? "You"
+      ? "👤 You"
       : normalizedRole === "assistant"
-        ? assistantName
+        ? `🤖 ${assistantName}`
         : normalizedRole;
   const roleClass =
     normalizedRole === "user" ? "user" : normalizedRole === "assistant" ? "assistant" : "other";

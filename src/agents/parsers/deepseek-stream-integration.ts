@@ -13,6 +13,11 @@ import {
   type DeepSeekWebClientOptions,
 } from "../providers/deepseek-web-client.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
+import { SessionManager, getGlobalSessionManager } from "./session-manager.js";
+import { PromptBuilder } from "./prompt-builder.js";
+import { DeepSeekStreamAdapter } from "./deepseek-stream-adapter.js";
+
+const FEATURE_FLAG = process.env.OPENCLAW_STREAM_ADAPTER_V2 === "true";
 
 interface DeepseekStreamOptions {
   searchEnabled?: boolean;
@@ -21,16 +26,6 @@ interface DeepseekStreamOptions {
   signal?: AbortSignal;
 }
 
-type MessageContentPart = {
-  type: string;
-  text?: string;
-  thinking?: string;
-  name?: string;
-  arguments?: string | Record<string, unknown>;
-  index?: number;
-  id?: string;
-};
-
 interface DeepSeekStreamContext {
   sessionId: string;
   runId?: string;
@@ -38,7 +33,15 @@ interface DeepSeekStreamContext {
   systemPrompt: string;
   messages: Array<{
     role: string;
-    content: string | MessageContentPart[];
+    content: string | Array<{
+      type: string;
+      text?: string;
+      thinking?: string;
+      name?: string;
+      arguments?: string | Record<string, unknown>;
+      index?: number;
+      id?: string;
+    }>;
   }>;
   tools: Array<{
     name: string;
@@ -46,15 +49,6 @@ interface DeepSeekStreamContext {
     parameters: Record<string, unknown>;
   }>;
 }
-
-type ToolResultContentPart = {
-  type: "text";
-  text: string;
-};
-
-type ToolResultMessageWithContent = ToolResultMessage & {
-  content: string | ToolResultContentPart[];
-};
 
 const sessionMap = new Map<string, string>();
 const parentMessageMap = new Map<string, string | number>();
@@ -64,181 +58,8 @@ const SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_SESSIONS = 100;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
-const REGEX_THINK_START = /<(?:think(?:ing)?|thought)\b[^<>]*>/i;
-const REGEX_THINK_END = /<\/(?:think(?:ing)?|thought)\b[^<>]*>/i;
-const REGEX_FINAL_START = /<final\b[^<>]*>/i;
-const REGEX_FINAL_END = /<\/final\b[^<>]*>/i;
-const REGEX_TOOL_CALL_START = /<(?:tool_call|tool_response)(?:\s+[^>]*)?>/i;
-const REGEX_TOOL_CALL_END = /<\/(?:tool_call|tool_response)\b[^<>]*>/i;
-const REGEX_REPLY = /\[\[reply_to_current\]\]/i;
-const REGEX_MALFORMED_THINK = /\n?think\s*>/i;
-
-function extractToolCallAttrs(tag: string): { id: string | null; name: string } {
-  const isToolResponse = tag.toLowerCase().includes("tool_response");
-  const idMatch = tag.match(/\bid\s*=\s*(['"]?)([^'"'\s]+)\1/i);
-  const nameMatch = tag.match(/\bname\s*=\s*(['"]?)([^'"'\s]*)\1/i);
-  let id = idMatch ? idMatch[2] : null;
-  let name = nameMatch ? nameMatch[2] : "";
-  if (isToolResponse) {
-    if (id && !name) {
-      name = id;
-      id = null;
-    }
-  }
-  return { id, name };
-}
-
-function buildPrompt(
-  messages: DeepSeekStreamContext["messages"],
-  systemPrompt: string,
-  tools: DeepSeekStreamContext["tools"],
-  sessionId: string,
-  parentMessageMap: Map<string, string | number>,
-): string {
-  const parentId = parentMessageMap.get(sessionId);
-
-  if (!parentId) {
-    const historyParts: string[] = [];
-
-    let systemPromptContent = systemPrompt;
-
-    if (tools.length > 0) {
-      let toolPrompt = DEFAULT_TOOL_INSTRUCTIONS;
-      for (const tool of tools) {
-        toolPrompt += `#### ${tool.name}\n${tool.description}\n`;
-        toolPrompt += `Parameters: ${JSON.stringify(tool.parameters)}\n\n`;
-      }
-      systemPromptContent += toolPrompt;
-    }
-
-    if (systemPromptContent && !messages.some((m) => m.role === "system")) {
-      console.log(
-        `[DeepseekWebStream] 📋 附加系统提示 (长度=${systemPromptContent.length})`,
-      );
-      historyParts.push(`System: ${systemPromptContent}`);
-    }
-
-    for (const m of messages) {
-      const msgRole = m.role;
-      if (msgRole === "toolResult") {
-        continue;
-      }
-      const role = msgRole === "user" ? "User" : "Assistant";
-      let content = "";
-
-      if (Array.isArray(m.content)) {
-        for (const part of m.content) {
-          if (part.type === "text") {
-            content += (part).text;
-          } else if (part.type === "thinking") {
-            content += `<think>\n${(part).thinking}\n
-</think>
-
-\n`;
-          } else if (part.type === "toolCall") {
-            const tc = part;
-            content += `<tool_call id="${tc.id}" name="${tc.name}">${JSON.stringify(tc.arguments)}</tool_call>`;
-          }
-        }
-      } else {
-        content = String(m.content);
-      }
-
-      console.log(
-        `[DeepseekWebStream] 💬 消息[${messages.indexOf(m)}] 角色=${m.role} 长度=${content.length} 预览=${content.slice(0, 30).replace(/\n/g, " ")}`,
-      );
-      historyParts.push(`${role}: ${content}`);
-    }
-
-    return historyParts.join("\n\n");
-  } else {
-    const lastMsg = messages[messages.length - 1];
-    if (lastMsg.role === "toolResult") {
-      const tr = lastMsg as ToolResultMessageWithContent;
-      let resultText = "";
-      if (Array.isArray(tr.content)) {
-        for (const part of tr.content) {
-          if (part.type === "text") {
-            resultText += part.text;
-          }
-        }
-      }
-      return `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>\n\nPlease proceed based on this tool result.`;
-    } else {
-      const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
-      if (lastUserMessage) {
-        if (typeof lastUserMessage.content === "string") {
-          return lastUserMessage.content;
-        } else if (Array.isArray(lastUserMessage.content)) {
-          return lastUserMessage.content
-            .filter((part) => part.type === "text")
-            .map((part) => (part as TextContent).text)
-            .join("");
-        }
-      }
-    }
-  }
-  return "";
-}
-
 const JUNK_TOKENS = new Set(["<｜end▁of▁thinking｜>", "<|endoftext|>"]);
 const INTERNAL_TOOLS = new Set(["web_search"]);
-
-const DEFAULT_TOOL_INSTRUCTIONS = `
-## Tool Use Instructions
-You are equipped with specialized tools to perform actions or retrieve information. 
-To use a tool, output a specific XML tag: <tool_call id="unique_id" name="tool_name">{"arg": "value"}</tool_call>. 
-Rules for tool use:
-1. ALWAYS think before calling a tool. Explain your reasoning inside <think> tags.
-2. The 'id' attribute should be a unique 8-character string for each call.
-3. Output the tool call tag ONLY inside a <final> section if you are in reasoning mode.
-4. Wait for the tool result before proceeding with further analysis.
-
-### Special Instructions for Browser Tool
-- **Profile 'openclaw' (Independent/Recommended)**: Opens a SEPARATE independent browser window. Use this for consistent, isolated sessions. Highly recommended for complex automation.
-- Profile 'chrome' (Shared): Uses your existing Chrome tabs (requires extension). Use this if you need to access personal logins or already open tabs.
-- **CONSISTENCY RULE**: Once you have started using a profile (or if you are switched to 'openclaw' due to connection errors), STAY with that profile for the remainder of the session. Do NOT switch back and forth as it will open redundant browser instances.
-
-### Automation Policy
-- DO NOT use the 'exec' tool to install secondary automation libraries like Playwright, Selenium, or Puppeteer if the 'browser' tool fails.
-- Instead, inform the user about the connection issue or try the alternative browser profile ('openclaw').
-- Installing automation tools via 'exec' is slow and redundant; the 'browser' tool is the primary way to interact with web content.
-
-### Multi-Agent Orchestration Protocol (三阶段 FSM)
-When the user gives a COMPLEX multi-step task, follow this 3-phase workflow:
-
-#### Phase 1: PLANNING (规划阶段)
-1. Call \`write_todos\` with action \`create_plan\` and a description — this creates plan with phase=planning
-2. Call \`write_todos\` with action \`add_todo\` for each major step (at least 3-5 steps)
-3. Present the implementation plan to the user as a structured overview
-4. Tell the user: "计划已创建，请在侧边栏确认后开始执行"
-5. When user sends 批准/approve/开始/确认/执行, IMMEDIATELY proceed to Phase 2
-
-#### Phase 2: EXECUTION (执行阶段) — FULLY AUTOMATIC
-Once approved, execute ALL steps without stopping:
-1. Call \`write_todos(set_phase, phase="execution")\` to transition
-2. For EACH todo: update status to in_progress → do the work (use browser/exec/web_fetch tools or sessions_spawn for subagents) → update status to done (pass the output as \`result\` if applicable)
-3. When using \`sessions_spawn\` to delegate a complex task, the tool automatically waits for the subagent to finish and returns its output inline. You must read it and then proceed.
-4. Do NOT stop between steps. Complete ALL todos in sequence automatically.
-
-#### Phase 3: VERIFICATION (验证阶段)
-After ALL todos are done:
-1. Call \`write_todos(set_phase, phase="verification")\`
-2. Synthesize all results into a consolidated report
-3. Call \`write_todos(complete_plan)\` to finalize
-
-Example:
-\`\`\`
-<tool_call id="plan0001" name="write_todos">{"action": "create_plan", "description": "Research task"}</tool_call>
-<tool_call id="todo0001" name="write_todos">{"action": "add_todo", "title": "Step 1"}</tool_call>
-\`\`\`
-
-[CRITICAL]: To use a tool, you MUST output the exact XML format: 
-<tool_call id="unique_id" name="tool_name">{"param": "value"}</tool_call>. 
-Writing about tools in plain text WILL NOT execute them.
-
-### Available Tools
-`;
 
 let lastCleanup = Date.now();
 
@@ -254,7 +75,6 @@ function cleanupOldSessions(): void {
       sessionMap.delete(key);
       parentMessageMap.delete(key);
       sessionTimestampMap.delete(key);
-      console.log(`[DeepseekWebStream] 🧹 清理过期会话: ${key}`);
     }
   }
 
@@ -266,7 +86,6 @@ function cleanupOldSessions(): void {
       sessionMap.delete(key);
       parentMessageMap.delete(key);
       sessionTimestampMap.delete(key);
-      console.log(`[DeepseekWebStream] 🧹 清理LRU会话: ${key}`);
     }
   }
 }
@@ -285,7 +104,18 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
   }
   const client = new DeepSeekWebClient(options);
 
-  return (model, context, options) => {
+  if (FEATURE_FLAG) {
+    return createStreamFnV2(client, options as DeepSeekWebClientOptions);
+  }
+
+  return createStreamFnV1(client, options as DeepSeekWebClientOptions);
+}
+
+function createStreamFnV1(
+  client: DeepSeekWebClient,
+  options: DeepSeekWebClientOptions,
+): StreamFn {
+  return (model, context, streamOptions) => {
     const stream = createAssistantMessageEventStream();
 
     const run = async () => {
@@ -311,27 +141,16 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         const messages = streamContext.messages;
         const systemPrompt = streamContext.systemPrompt;
         const tools = streamContext.tools;
-        console.log(
-          `[DeepseekWebStream] 📝 消息数: ${messages.length}, 系统提示: ${systemPrompt ? "有" : "无"}`,
-        );
 
         const prompt = buildPrompt(messages, systemPrompt, tools, sessionKey, parentMessageMap);
 
-        console.log(
-          `[DeepseekWebStream] 🚀 开始对话 | 会话: ${sessionKey.slice(0, 8)}... | 提示长度: ${prompt.length}`,
-        );
-        console.log(`[DeepseekWebStream] 📄 提示预览: ${prompt.slice(0, 80)}...`);
-
         if (!prompt) {
-          console.error(`[DeepseekWebStream] ❌ 无可发送的消息:`, JSON.stringify(messages));
           throw new Error("No message found to send to DeepSeek web API");
         }
 
-        const streamOptions: DeepseekStreamOptions = options ?? {};
-
-        const searchEnabled = streamOptions.searchEnabled ?? true;
-        const preempt = streamOptions.preempt ?? false;
-        const fileIds = streamOptions.fileIds || [];
+        const searchEnabled = streamOptions?.searchEnabled ?? true;
+        const preempt = streamOptions?.preempt ?? false;
+        const fileIds = streamOptions?.fileIds || [];
 
         const responseStream = await client.chatCompletions({
           sessionId: dsSessionId,
@@ -341,7 +160,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           searchEnabled,
           preempt,
           fileIds,
-          signal: streamOptions.signal,
+          signal: streamOptions?.signal,
         });
 
         if (!responseStream) {
@@ -352,7 +171,13 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         const decoder = new TextDecoder();
         const accumulatedContentParts: string[] = [];
         const accumulatedReasoningParts: string[] = [];
-        const accumulatedToolCalls: MessageContentPart[] = [];
+        const accumulatedToolCalls: Array<{
+          type: string;
+          name: string;
+          arguments: string;
+          index: number;
+          id: string;
+        }> = [];
         let buffer = "";
         let lastEmittedThinking = "";
 
@@ -384,7 +209,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         const inputTokenCount = estimateTokens(prompt);
         let outputTokenCount = 0;
 
-        // Sequential indexing for pi-ai AssistantMessage events
         const indexMap = new Map<string, number>();
         let nextIndex = 0;
         const contentParts: (TextContent | ThinkingContent | ToolCall)[] = [];
@@ -412,12 +236,35 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           return msg;
         };
 
-        // Stateful parser for tags in the text stream
         let currentMode: "text" | "thinking" | "tool_call" = "text";
         let currentToolName = "";
         let currentToolIndex = 0;
         let tagBuffer = "";
         let skippingInternalTool = false;
+
+        const REGEX_THINK_START = /<(?:think(?:ing)?|thought)\b[^<>]*>/i;
+        const REGEX_THINK_END = /<\/(?:think(?:ing)?|thought)\b[^<>]*>/i;
+        const REGEX_FINAL_START = /<final\b[^<>]*>/i;
+        const REGEX_FINAL_END = /<\/final\b[^<>]*>/i;
+        const REGEX_TOOL_CALL_START = /<(?:tool_call|tool_response)(?:\s+[^>]*)?>/i;
+        const REGEX_TOOL_CALL_END = /<\/(?:tool_call|tool_response)\b[^<>]*>/i;
+        const REGEX_REPLY = /\[\[reply_to_current\]\]/i;
+        const REGEX_MALFORMED_THINK = /\n?think\s*>/i;
+
+        const extractToolCallAttrs = (tag: string): { id: string | null; name: string } => {
+          const isToolResponse = tag.toLowerCase().includes("tool_response");
+          const idMatch = tag.match(/\bid\s*=\s*(['"]?)([^'"'\s]+)\1/i);
+          const nameMatch = tag.match(/\bname\s*=\s*(['"]?)([^'"'\s]*)\1/i);
+          let id = idMatch ? idMatch[2] : null;
+          let name = nameMatch ? nameMatch[2] : "";
+          if (isToolResponse) {
+            if (id && !name) {
+              name = id;
+              id = null;
+            }
+          }
+          return { id, name };
+        };
 
         const emitDelta = (
           type: "text" | "thinking" | "toolcall",
@@ -518,7 +365,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           }
 
           if (JUNK_TOKENS.has(delta)) {
-            console.log(`[DeepseekWebStream] 🗑️ 过滤垃圾token: ${delta}`);
             return;
           }
 
@@ -539,7 +385,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
             const replyMatch = tagBuffer.match(REGEX_REPLY);
             const malformedThinkMatch = tagBuffer.match(REGEX_MALFORMED_THINK);
 
-            // Priority: find the first occurring tag
             const indices = [
               {
                 type: "think_start",
@@ -578,7 +423,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 len: replyMatch ? replyMatch[0].length : 0,
               },
               {
-                type: "think_start", // Treat malformed think> as start
+                type: "think_start",
                 idx: malformedThinkMatch ? malformedThinkMatch.index! : -1,
                 len: malformedThinkMatch ? malformedThinkMatch[0].length : 0,
               },
@@ -607,16 +452,13 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
               } else if (first.type === "tool_call_start") {
                 const attrs = first as { id?: string | null; name?: string };
                 const toolName = attrs.name || "";
-                console.log(`[DeepseekWebStream] 🔧 检测到工具调用开始: name=${toolName}, id=${attrs.id}, tagBuffer前20字符: ${tagBuffer.slice(0, 20)}`);
                 if (INTERNAL_TOOLS.has(toolName)) {
-                  console.log(`[DeepseekWebStream] ⏭️ 跳过内部工具: ${toolName}`);
                   skippingInternalTool = true;
                   currentMode = "text";
                 } else {
                   currentMode = "tool_call";
                   currentToolName = toolName;
                   const toolId = attrs.id || `call_${Date.now()}_${currentToolIndex}`;
-                  console.log(`[DeepseekWebStream] ✅ 开始解析工具调用: name=${toolName}, id=${toolId}`);
                   emitDelta("toolcall", "", toolId);
                 }
               } else if (first.type === "tool_call_end") {
@@ -632,12 +474,9 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                     const argStr = typeof argData === "string" ? argData : JSON.stringify(argData);
                     try {
                       part.arguments = JSON.parse(argStr);
-                    } catch (e) {
-                      console.log(`[DeepseekWebStream] ⚠️ 工具参数解析错误: ${e instanceof Error ? e.message : String(e)}, 原始: ${argStr.slice(0, 100)}`);
+                    } catch {
                       part.arguments = { raw: argStr };
                     }
-                    const argsStr = JSON.stringify(part.arguments);
-                    console.log(`\x1b[33m[DeepseekWebStream] 🔧 工具调用: ${part.name}, 参数: ${argsStr.length > 100 ? argsStr.slice(0, 100) + "..." : argsStr}\x1b[0m`);
                     stream.push({
                       type: "toolcall_end",
                       contentIndex: index,
@@ -675,7 +514,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           }
 
           if (line.startsWith("event: ")) {
-            return; // We don't strictly need currentEvent if we trust the data structure
+            return;
           }
 
           if (line.startsWith("data: ")) {
@@ -689,17 +528,13 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
 
             try {
               const data = JSON.parse(dataStr);
-              // Verbose logging for debugging
-              // console.log(`[DeepseekWebStream] SSE Data: ${dataStr}`);
 
-              // Capture session/message continuity
               if (data.response_message_id) {
                 if (data.response_message_id !== parentMessageMap.get(sessionKey)) {
                   parentMessageMap.set(sessionKey, data.response_message_id);
                 }
               }
 
-              // 1. Path update or explicit type for reasoning
               if (
                 (data.p?.includes("reasoning") || data.type === "thinking") &&
                 typeof data.v === "string"
@@ -712,7 +547,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 return;
               }
 
-              // 2. Direct string value, content path, or explicit type (XML tags might be here)
               if (
                 typeof data.v === "string" &&
                 (!data.p || data.p.includes("content") || data.p.includes("choices"))
@@ -725,7 +559,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 return;
               }
 
-              // 2.5 search results (if enabled)
               if (data.type === "search_result" || data.p?.includes("search_results")) {
                 const searchData = data.v || data.content;
                 const query =
@@ -743,7 +576,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 return;
               }
 
-              // 3. Nested fragments (init)
               const fragments = data.v?.response?.fragments;
               if (Array.isArray(fragments)) {
                 for (const frag of fragments) {
@@ -756,7 +588,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                 return;
               }
 
-              // 4. Standard OpenAI-like choices (just in case)
               const choice = data.choices?.[0];
               if (choice) {
                 if (choice.delta?.reasoning_content) {
@@ -766,8 +597,8 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
                   pushDelta(choice.delta.content);
                 }
               }
-            } catch (e) {
-              console.log(`[DeepseekWebStream] ⚠️ JSON解析错误: ${e instanceof Error ? e.message : String(e)}, 数据: ${dataStr.slice(0, 100)}`);
+            } catch {
+              // Silent fail for parse errors
             }
           }
         };
@@ -779,8 +610,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
               processLine(buffer.trim());
             }
 
-            // Flush any remaining tag buffer
-            // Flush any remaining tag buffer
             if (tagBuffer) {
               const mode = currentMode as unknown as string;
               if (mode === "thinking") {
@@ -798,7 +627,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           const chunk = decoder.decode(value, { stream: true });
           const combined = buffer + chunk;
           const parts = combined.split("\n");
-          buffer = parts.pop() || ""; // Save partial line
+          buffer = parts.pop() || "";
 
           for (const part of parts) {
             processLine(part.trim());
@@ -806,17 +635,11 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         }
 
         const totalTokens = inputTokenCount + Math.ceil(outputTokenCount / 4);
-        console.log(
-          `[DeepseekWebStream] ✅ 对话完成 | 内容: ${getAccumulatedContent().length}字符 | 思考: ${getAccumulatedReasoning().length}字符 | 工具调用: ${accumulatedToolCalls.length} | 输入: ${inputTokenCount} | 输出: ${Math.ceil(outputTokenCount / 4)} | 总计: ${totalTokens}`,
-        );
 
-        // Filter internal tools from final message as per original logic,
-        // but keep them in the stream parts for UI continuity.
         const finalContent = contentParts.filter((part) => {
           if (part.type === "toolCall") {
             return !INTERNAL_TOOLS.has(part.name);
           }
-          // Filter out empty thinking/text if they are totally empty to keep final message clean
           if (part.type === "thinking" && !part.thinking) {
             return false;
           }
@@ -845,12 +668,6 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         };
         (assistantMessage as unknown as { thinking_enabled: boolean }).thinking_enabled =
           !!getAccumulatedReasoning();
-
-        const toolCallParts = assistantMessage.content.filter(p => p.type === "toolCall");
-        console.log(`[DeepseekWebStream] 📤 发送done事件: stopReason=${assistantMessage.stopReason}, 内容数量=${assistantMessage.content.length}, toolCall数量=${toolCallParts.length}`);
-        if (toolCallParts.length > 0) {
-          console.log(`[DeepseekWebStream] 📋 工具调用列表:`, toolCallParts.map(p => ({ name: p.name, id: p.id })));
-        }
 
         stream.push({
           type: "done",
@@ -889,4 +706,472 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
     queueMicrotask(() => void run());
     return stream;
   };
+}
+
+function createStreamFnV2(
+  client: DeepSeekWebClient,
+  options: DeepSeekWebClientOptions,
+): StreamFn {
+  const sessionManager = getGlobalSessionManager();
+  const promptBuilder = new PromptBuilder();
+
+  return (model, context, streamOptions) => {
+    const stream = createAssistantMessageEventStream();
+
+    const run = async () => {
+      try {
+        await client.init();
+
+        const streamContext = context as unknown as DeepSeekStreamContext;
+        const sessionKey = streamContext.sessionId || "default";
+        const runId = streamContext.runId;
+
+        let session = sessionManager.get(sessionKey);
+        let dsSessionId = session?.dsSessionId;
+        let parentId = session?.parentId;
+
+        if (!dsSessionId) {
+          const chatSession = await client.createChatSession();
+          dsSessionId = chatSession.chat_session_id || "";
+          sessionManager.set(sessionKey, dsSessionId);
+          parentId = undefined;
+        } else {
+          sessionManager.set(sessionKey, dsSessionId, parentId);
+        }
+
+        const messages = streamContext.messages;
+        const systemPrompt = streamContext.systemPrompt;
+        const tools = streamContext.tools;
+
+        const prompt = promptBuilder.build(messages, systemPrompt, tools, sessionKey, parentId);
+
+        if (!prompt) {
+          throw new Error("No message found to send to DeepSeek web API");
+        }
+
+        const searchEnabled = streamOptions?.searchEnabled ?? true;
+        const preempt = streamOptions?.preempt ?? false;
+        const fileIds = streamOptions?.fileIds || [];
+
+        const responseStream = await client.chatCompletions({
+          sessionId: dsSessionId,
+          parentMessageId: parentId,
+          message: prompt,
+          model: model.id,
+          searchEnabled,
+          preempt,
+          fileIds,
+          signal: streamOptions?.signal,
+        });
+
+        if (!responseStream) {
+          throw new Error("DeepSeek Web API returned empty response body");
+        }
+
+        const indexMap = new Map<string, number>();
+        let nextIndex = 0;
+        const contentParts: (TextContent | ThinkingContent | ToolCall)[] = [];
+        const accumulatedToolCalls: ToolCall[] = [];
+
+        const createPartial = (): AssistantMessage => {
+          const msg: AssistantMessage = {
+            role: "assistant",
+            content: [...contentParts],
+            api: model.api,
+            provider: model.provider,
+            model: model.id,
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: accumulatedToolCalls.length > 0 ? "toolUse" : "stop",
+            timestamp: Date.now(),
+          };
+          return msg;
+        };
+
+        let lastThinkingContent = "";
+
+        const adapter = new DeepSeekStreamAdapter(responseStream, {
+          signal: streamOptions?.signal,
+          onThinking: (delta, full) => {
+            if (!runId) return;
+            lastThinkingContent = full;
+            emitAgentEvent({
+              runId,
+              stream: "thinking",
+              data: { text: full, delta },
+              sessionKey: streamContext.sessionKey,
+            });
+          },
+          onToolCall: (toolCall) => {
+            if (runId) {
+              emitAgentEvent({
+                runId,
+                stream: "tool",
+                data: {
+                  toolCallId: toolCall.id,
+                  name: toolCall.name,
+                  args: toolCall.arguments,
+                  phase: "result",
+                },
+                sessionKey: streamContext.sessionKey,
+              });
+            }
+          },
+        });
+
+        for await (const event of adapter) {
+          switch (event.type) {
+            case "text_delta": {
+              const data = event.data as { content: string; delta: string };
+              const key = "text";
+              if (!indexMap.has(key)) {
+                const index = nextIndex++;
+                indexMap.set(key, index);
+                contentParts[index] = { type: "text", text: "" };
+                stream.push({ type: "text_start", contentIndex: index, partial: createPartial() });
+              }
+              const index = indexMap.get(key)!;
+              (contentParts[index] as TextContent).text += data.delta;
+              stream.push({
+                type: "text_delta",
+                contentIndex: index,
+                delta: data.delta,
+                partial: createPartial(),
+              });
+              break;
+            }
+            case "thinking_delta": {
+              const data = event.data as { content: string; delta: string };
+              const key = "thinking";
+              if (!indexMap.has(key)) {
+                const index = nextIndex++;
+                indexMap.set(key, index);
+                contentParts[index] = { type: "thinking", thinking: "" };
+                stream.push({
+                  type: "thinking_start",
+                  contentIndex: index,
+                  partial: createPartial(),
+                });
+              }
+              const index = indexMap.get(key)!;
+              (contentParts[index] as ThinkingContent).thinking += data.delta;
+              stream.push({
+                type: "thinking_delta",
+                contentIndex: index,
+                delta: data.delta,
+                partial: createPartial(),
+              });
+              break;
+            }
+            case "toolcall_start": {
+              const toolCall = event.data as {
+                id: string;
+                name: string;
+                arguments: Record<string, unknown> | string;
+              };
+              const index = nextIndex++;
+              const toolCallPart: ToolCall = {
+                type: "toolCall",
+                id: toolCall.id,
+                name: toolCall.name,
+                arguments: toolCall.arguments,
+              };
+              contentParts[index] = toolCallPart;
+              accumulatedToolCalls.push(toolCallPart);
+              stream.push({
+                type: "toolcall_start",
+                contentIndex: index,
+                partial: createPartial(),
+              });
+              break;
+            }
+            case "toolcall_delta": {
+              const data = event.data as { content?: string; delta?: string };
+              const index = accumulatedToolCalls.length - 1;
+              if (index >= 0 && contentParts[index]?.type === "toolCall") {
+                const delta = data.delta || "";
+                const existingArgs = (contentParts[index] as ToolCall).arguments;
+                if (typeof existingArgs === "string") {
+                  (contentParts[index] as ToolCall).arguments = existingArgs + delta;
+                }
+                stream.push({
+                  type: "toolcall_delta",
+                  contentIndex: index,
+                  delta,
+                  partial: createPartial(),
+                });
+              }
+              break;
+            }
+            case "toolcall_end": {
+              const toolCall = event.data as {
+                id: string;
+                name: string;
+                arguments: Record<string, unknown>;
+              };
+              const index = accumulatedToolCalls.length - 1;
+              if (index >= 0 && contentParts[index]?.type === "toolCall") {
+                (contentParts[index] as ToolCall).arguments = toolCall.arguments;
+                stream.push({
+                  type: "toolcall_end",
+                  contentIndex: index,
+                  toolCall: contentParts[index] as ToolCall,
+                  partial: createPartial(),
+                });
+              }
+              break;
+            }
+            case "done": {
+              const data = event.data as {
+                content: string;
+                reasoning: string;
+                toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+              };
+
+              const finalContent = contentParts.filter((part) => {
+                if (part.type === "toolCall") {
+                  return !INTERNAL_TOOLS.has(part.name);
+                }
+                if (part.type === "thinking" && !(part as ThinkingContent).thinking) {
+                  return false;
+                }
+                if (part.type === "text" && !(part as TextContent).text) {
+                  return false;
+                }
+                return true;
+              });
+
+              const assistantMessage: AssistantMessage = {
+                role: "assistant",
+                content: finalContent,
+                stopReason: finalContent.some((p) => p.type === "toolCall") ? "toolUse" : "stop",
+                api: model.api,
+                provider: model.provider,
+                model: model.id,
+                usage: {
+                  input: Math.ceil(Buffer.byteLength(prompt, "utf8") / 4),
+                  output: Math.ceil(Buffer.byteLength(data.content, "utf8") / 4),
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  totalTokens: 0,
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+                },
+                timestamp: Date.now(),
+              };
+              (assistantMessage as unknown as { thinking_enabled: boolean }).thinking_enabled =
+                !!data.reasoning;
+
+              stream.push({
+                type: "done",
+                reason: assistantMessage.stopReason as "stop" | "length" | "toolUse",
+                message: assistantMessage,
+              });
+              break;
+            }
+            case "error": {
+              const error = event.data as Error;
+              stream.push({
+                type: "error",
+                reason: "error",
+                error: {
+                  role: "assistant",
+                  content: [],
+                  stopReason: "error",
+                  errorMessage: error.message,
+                  api: model.api,
+                  provider: model.provider,
+                  model: model.id,
+                  usage: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                    totalTokens: 0,
+                    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+                  },
+                  timestamp: Date.now(),
+                },
+              } as AssistantMessageEvent);
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        stream.push({
+          type: "error",
+          reason: "error",
+          error: {
+            role: "assistant",
+            content: [],
+            stopReason: "error",
+            errorMessage,
+            api: model.api,
+            provider: model.provider,
+            model: model.id,
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            timestamp: Date.now(),
+          },
+        } as AssistantMessageEvent);
+      } finally {
+        stream.end();
+      }
+    };
+
+    queueMicrotask(() => void run());
+    return stream;
+  };
+}
+
+function buildPrompt(
+  messages: DeepSeekStreamContext["messages"],
+  systemPrompt: string,
+  tools: DeepSeekStreamContext["tools"],
+  sessionId: string,
+  parentMessageMap: Map<string, string | number>,
+): string {
+  const DEFAULT_TOOL_INSTRUCTIONS = `
+## Tool Use Instructions
+You are equipped with specialized tools to perform actions or retrieve information. 
+To use a tool, output a specific XML tag: <tool_call id="unique_id" name="tool_name">{"arg": "value"}</tool_call>. 
+Rules for tool use:
+1. ALWAYS think before calling a tool. Explain your reasoning inside <think> tags.
+2. The 'id' attribute should be a unique 8-character string for each call.
+3. Output the tool call tag ONLY inside a <final> section if you are in reasoning mode.
+4. Wait for the tool result before proceeding with further analysis.
+
+### Special Instructions for Browser Tool
+- **Profile 'openclaw' (Independent/Recommended)**: Opens a SEPARATE independent browser window. Use this for consistent, isolated sessions. Highly recommended for complex automation.
+- Profile 'chrome' (Shared): Uses your existing Chrome tabs (requires extension). Use this if you need to access personal logins or already open tabs.
+- **CONSISTENCY RULE**: Once you have started using a profile (or if you are switched to 'openclaw' due to connection errors), STAY with that profile for the remainder of the session. Do NOT switch back and forth as it will open redundant browser instances.
+
+### Automation Policy
+- DO NOT use the 'exec' tool to install secondary automation libraries like Playwright, Selenium, or Puppeteer if the 'browser' tool fails.
+- Instead, inform the user about the connection issue or try the alternative browser profile ('openclaw').
+- Installing automation tools via 'exec' is slow and redundant; the 'browser' tool is the primary way to interact with web content.
+
+### Multi-Agent Orchestration Protocol (三阶段 FSM)
+When the user gives a COMPLEX multi-step task, follow this 3-phase workflow:
+
+#### Phase 1: PLANNING (规划阶段)
+1. Call \`write_todos\` with action \`create_plan\` and a description — this creates plan with phase=planning
+2. Call \`write_todos\` with action \`add_todo\` for each major step (at least 3-5 steps)
+3. Present the implementation plan to the user as a structured overview
+4. Tell the user: "计划已创建，请在侧边栏确认后开始执行"
+5. When user sends 批准/approve/开始/确认/执行, IMMEDIATELY proceed to Phase 2
+
+#### Phase 2: EXECUTION (执行阶段) — FULLY AUTOMATIC
+Once approved, execute ALL steps without stopping:
+1. Call \`write_todos(set_phase, phase="execution")\` to transition
+2. For EACH todo: update status to in_progress → do the work (use browser/exec/web_fetch tools or sessions_spawn for subagents) → update status to done (pass the output as \`result\` if applicable)
+3. When using \`sessions_spawn\` to delegate a complex task, the tool automatically waits for the subagent to finish and returns its output inline. You must read it and then proceed.
+4. Do NOT stop between steps. Complete ALL todos in sequence automatically.
+
+#### Phase 3: VERIFICATION (验证阶段)
+After ALL todos are done:
+1. Call \`write_todos(set_phase, phase="verification")\`
+2. Synthesize all results into a consolidated report
+3. Call \`write_todos(complete_plan)\` to finalize
+
+Example:
+\`\`\`
+<tool_call id="plan0001" name="write_todos">{"action": "create_plan", "description": "Research task"}</tool_call>
+<tool_call id="todo0001" name="write_todos">{"action": "add_todo", "title": "Step 1"}</tool_call>
+\`\`\`
+
+[CRITICAL]: To use a tool, you MUST output the exact XML format: 
+<tool_call id="unique_id" name="tool_name">{"param": "value"}</tool_call>. 
+Writing about tools in plain text WILL NOT execute them.
+
+### Available Tools
+`;
+
+  const parentId = parentMessageMap.get(sessionId);
+
+  if (!parentId) {
+    const historyParts: string[] = [];
+
+    let systemPromptContent = systemPrompt;
+
+    if (tools.length > 0) {
+      let toolPrompt = DEFAULT_TOOL_INSTRUCTIONS;
+      for (const tool of tools) {
+        toolPrompt += `#### ${tool.name}\n${tool.description}\n`;
+        toolPrompt += `Parameters: ${JSON.stringify(tool.parameters)}\n\n`;
+      }
+      systemPromptContent += toolPrompt;
+    }
+
+    if (systemPromptContent && !messages.some((m) => m.role === "system")) {
+      historyParts.push(`System: ${systemPromptContent}`);
+    }
+
+    for (const m of messages) {
+      const role = m.role === "assistant" ? "Assistant" : m.role === "user" ? "User" : m.role;
+      let content = "";
+
+      if (typeof m.content === "string") {
+        content = m.content;
+      } else if (Array.isArray(m.content)) {
+        for (const part of m.content) {
+          if (part.type === "text") {
+            content += `\n${part.text}\n`;
+          } else if (part.type === "thinking") {
+            content += `\n${part.thinking}\n`;
+          } else if (part.type === "toolCall") {
+            const tc = part;
+            content += `<tool_call id="${tc.id}" name="${tc.name}">${JSON.stringify(tc.arguments)}</tool_call>`;
+          }
+        }
+      } else {
+        content = String(m.content);
+      }
+
+      historyParts.push(`${role}: ${content}`);
+    }
+
+    return historyParts.join("\n\n");
+  } else {
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === "toolResult") {
+      const tr = lastMsg as unknown as ToolResultMessage & {
+        content: string | Array<{ type: "text"; text: string }>;
+      };
+      let resultText = "";
+      if (Array.isArray(tr.content)) {
+        for (const part of tr.content) {
+          if (part.type === "text") {
+            resultText += part.text;
+          }
+        }
+      }
+      return `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>\n\nPlease proceed based on this tool result.`;
+    } else {
+      const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
+      if (lastUserMessage) {
+        if (typeof lastUserMessage.content === "string") {
+          return lastUserMessage.content;
+        } else if (Array.isArray(lastUserMessage.content)) {
+          return lastUserMessage.content
+            .filter((part) => part.type === "text")
+            .map((part) => (part as TextContent).text)
+            .join("");
+        }
+      }
+    }
+  }
+  return "";
 }

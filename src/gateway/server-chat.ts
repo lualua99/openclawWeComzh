@@ -360,6 +360,7 @@ export function createAgentEventHandler({
     sourceRunId: string,
     seq: number,
     jobState: "done" | "error",
+    fullMessage?: { content: unknown[]; stopReason?: string },
     error?: unknown,
   ) => {
     const bufferedText = stripInlineDirectiveTagsForDisplay(
@@ -377,16 +378,25 @@ export function createAgentEventHandler({
     chatRunState.deltaSentAt.delete(clientRunId);
     chatRunState.thinkingDeltaSentAt.delete(clientRunId);
     if (jobState === "done") {
+      let messageContent: unknown[];
+      if (fullMessage?.content && fullMessage.content.length > 0) {
+        messageContent = fullMessage.content as unknown[];
+      } else if (text && !shouldSuppressSilent) {
+        messageContent = [{ type: "text", text }];
+      } else {
+        messageContent = [];
+      }
       const payload = {
         runId: clientRunId,
         sessionKey,
         seq,
         state: "final" as const,
         message:
-          text && !shouldSuppressSilent
+          messageContent.length > 0
             ? {
                 role: "assistant",
-                content: [{ type: "text", text }],
+                content: messageContent,
+                stopReason: fullMessage?.stopReason,
                 timestamp: Date.now(),
               }
             : undefined,
@@ -498,6 +508,9 @@ export function createAgentEventHandler({
         const isStart = evt.data.text === "" && evt.data.delta === "";
         emitThinkingDelta(sessionKey, clientRunId, evt.runId, evt.seq, evt.data.text, isStart);
       } else if (!isAborted && (lifecyclePhase === "end" || lifecyclePhase === "error")) {
+        const fullMessage = lifecyclePhase === "end" && evt.data && evt.data.message
+          ? { content: evt.data.message as unknown[], stopReason: evt.data.stopReason as string | undefined }
+          : undefined;
         if (chatLink) {
           const finished = chatRunState.registry.shift(evt.runId);
           if (!finished) {
@@ -510,6 +523,7 @@ export function createAgentEventHandler({
             evt.runId,
             evt.seq,
             lifecyclePhase === "error" ? "error" : "done",
+            fullMessage,
             evt.data?.error,
           );
         } else {
@@ -519,6 +533,7 @@ export function createAgentEventHandler({
             evt.runId,
             evt.seq,
             lifecyclePhase === "error" ? "error" : "done",
+            fullMessage,
             evt.data?.error,
           );
         }
