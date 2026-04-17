@@ -323,8 +323,18 @@ function createStreamFnV1(
               type: "text_delta",
               contentIndex: index,
               delta,
+              text: delta,
               partial: createPartial(),
-            });
+            } as any);
+            if (runId) {
+              const fullText = getAccumulatedContent();
+              emitAgentEvent({
+                runId,
+                stream: "assistant",
+                data: { text: fullText, delta },
+                sessionKey: streamContext.sessionKey,
+              });
+            }
           } else if (type === "thinking") {
             (contentParts[index] as ThinkingContent).thinking += delta;
             accumulatedReasoningParts.push(delta);
@@ -842,8 +852,18 @@ function createStreamFnV2(
                 type: "text_delta",
                 contentIndex: index,
                 delta: data.delta,
+                text: data.delta,
                 partial: createPartial(),
-              });
+              } as any);
+              if (runId) {
+                const fullText = (contentParts[index] as TextContent).text;
+                emitAgentEvent({
+                  runId,
+                  stream: "assistant",
+                  data: { text: fullText, delta: data.delta },
+                  sessionKey: streamContext.sessionKey,
+                });
+              }
               break;
             }
             case "thinking_delta": {

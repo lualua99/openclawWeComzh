@@ -350,7 +350,23 @@ export async function resolvePromptBuildHookResult(params: {
 }): Promise<PluginHookBeforePromptBuildResult> {
   const promptBuildResult = params.hookRunner?.hasHooks("before_prompt_build")
     ? await params.hookRunner
-        .runBeforePromptBuild(
+      .runBeforePromptBuild(
+        {
+          prompt: params.prompt,
+          messages: params.messages,
+        },
+        params.hookCtx,
+      )
+      .catch((hookErr: unknown) => {
+        log.warn(`before_prompt_build hook failed: ${String(hookErr)}`);
+        return undefined;
+      })
+    : undefined;
+  const legacyResult =
+    params.legacyBeforeAgentStartResult ??
+    (params.hookRunner?.hasHooks("before_agent_start")
+      ? await params.hookRunner
+        .runBeforeAgentStart(
           {
             prompt: params.prompt,
             messages: params.messages,
@@ -358,27 +374,11 @@ export async function resolvePromptBuildHookResult(params: {
           params.hookCtx,
         )
         .catch((hookErr: unknown) => {
-          log.warn(`before_prompt_build hook failed: ${String(hookErr)}`);
+          log.warn(
+            `before_agent_start hook (legacy prompt build path) failed: ${String(hookErr)}`,
+          );
           return undefined;
         })
-    : undefined;
-  const legacyResult =
-    params.legacyBeforeAgentStartResult ??
-    (params.hookRunner?.hasHooks("before_agent_start")
-      ? await params.hookRunner
-          .runBeforeAgentStart(
-            {
-              prompt: params.prompt,
-              messages: params.messages,
-            },
-            params.hookCtx,
-          )
-          .catch((hookErr: unknown) => {
-            log.warn(
-              `before_agent_start hook (legacy prompt build path) failed: ${String(hookErr)}`,
-            );
-            return undefined;
-          })
       : undefined);
   return {
     systemPrompt: promptBuildResult?.systemPrompt ?? legacyResult?.systemPrompt,
@@ -503,13 +503,13 @@ export async function runEmbeddedAttempt(
       : [];
     restoreSkillEnv = params.skillsSnapshot
       ? applySkillEnvOverridesFromSnapshot({
-          snapshot: params.skillsSnapshot,
-          config: params.config,
-        })
+        snapshot: params.skillsSnapshot,
+        config: params.config,
+      })
       : applySkillEnvOverrides({
-          skills: skillEntries ?? [],
-          config: params.config,
-        });
+        skills: skillEntries ?? [],
+        config: params.config,
+      });
 
     const skillsPrompt = resolveSkillsPromptForRun({
       skillsSnapshot: params.skillsSnapshot,
@@ -549,45 +549,45 @@ export async function runEmbeddedAttempt(
     const toolsRaw = params.disableTools
       ? []
       : createOpenClawCodingTools({
-          agentId: sessionAgentId,
-          exec: {
-            ...params.execOverrides,
-            elevated: params.bashElevated,
-          },
-          sandbox,
-          messageProvider: params.messageChannel ?? params.messageProvider,
-          agentAccountId: params.agentAccountId,
-          messageTo: params.messageTo,
-          messageThreadId: params.messageThreadId,
-          groupId: params.groupId,
-          groupChannel: params.groupChannel,
-          groupSpace: params.groupSpace,
-          spawnedBy: params.spawnedBy,
-          senderId: params.senderId,
-          senderName: params.senderName,
-          senderUsername: params.senderUsername,
-          senderE164: params.senderE164,
-          senderIsOwner: params.senderIsOwner,
-          sessionKey: params.sessionKey ?? params.sessionId,
-          agentDir,
-          workspaceDir: effectiveWorkspace,
-          config: params.config,
-          abortSignal: runAbortController.signal,
-          modelProvider: params.model.provider,
-          modelId: params.modelId,
-          modelContextWindowTokens: params.model.contextWindow,
-          modelAuthMode: resolveModelAuthMode(params.model.provider, params.config),
-          currentChannelId: params.currentChannelId,
-          currentThreadTs: params.currentThreadTs,
-          currentMessageId: params.currentMessageId,
-          replyToMode: params.replyToMode,
-          hasRepliedRef: params.hasRepliedRef,
-          modelHasVision,
-          requireExplicitMessageTarget:
-            params.requireExplicitMessageTarget ?? isSubagentSessionKey(params.sessionKey),
-          disableMessageTool: params.disableMessageTool,
-          iterationDepth: params.iterationDepth,
-        });
+        agentId: sessionAgentId,
+        exec: {
+          ...params.execOverrides,
+          elevated: params.bashElevated,
+        },
+        sandbox,
+        messageProvider: params.messageChannel ?? params.messageProvider,
+        agentAccountId: params.agentAccountId,
+        messageTo: params.messageTo,
+        messageThreadId: params.messageThreadId,
+        groupId: params.groupId,
+        groupChannel: params.groupChannel,
+        groupSpace: params.groupSpace,
+        spawnedBy: params.spawnedBy,
+        senderId: params.senderId,
+        senderName: params.senderName,
+        senderUsername: params.senderUsername,
+        senderE164: params.senderE164,
+        senderIsOwner: params.senderIsOwner,
+        sessionKey: params.sessionKey ?? params.sessionId,
+        agentDir,
+        workspaceDir: effectiveWorkspace,
+        config: params.config,
+        abortSignal: runAbortController.signal,
+        modelProvider: params.model.provider,
+        modelId: params.modelId,
+        modelContextWindowTokens: params.model.contextWindow,
+        modelAuthMode: resolveModelAuthMode(params.model.provider, params.config),
+        currentChannelId: params.currentChannelId,
+        currentThreadTs: params.currentThreadTs,
+        currentMessageId: params.currentMessageId,
+        replyToMode: params.replyToMode,
+        hasRepliedRef: params.hasRepliedRef,
+        modelHasVision,
+        requireExplicitMessageTarget:
+          params.requireExplicitMessageTarget ?? isSubagentSessionKey(params.sessionKey),
+        disableMessageTool: params.disableMessageTool,
+        iterationDepth: params.iterationDepth,
+      });
     const tools = sanitizeToolsForGoogle({ tools: toolsRaw, provider: params.provider });
     const allowedToolNames = collectAllowedToolNames({
       tools,
@@ -599,10 +599,10 @@ export async function runEmbeddedAttempt(
     const runtimeChannel = normalizeMessageChannel(params.messageChannel ?? params.messageProvider);
     let runtimeCapabilities = runtimeChannel
       ? (resolveChannelCapabilities({
-          cfg: params.config,
-          channel: runtimeChannel,
-          accountId: params.agentAccountId,
-        }) ?? [])
+        cfg: params.config,
+        channel: runtimeChannel,
+        accountId: params.agentAccountId,
+      }) ?? [])
       : undefined;
     if (runtimeChannel === "telegram" && params.config) {
       const inlineButtonsScope = resolveTelegramInlineButtonsScope({
@@ -623,40 +623,40 @@ export async function runEmbeddedAttempt(
     const reactionGuidance =
       runtimeChannel && params.config
         ? (() => {
-            if (runtimeChannel === "telegram") {
-              const resolved = resolveTelegramReactionLevel({
-                cfg: params.config,
-                accountId: params.agentAccountId ?? undefined,
-              });
-              const level = resolved.agentReactionGuidance;
-              return level ? { level, channel: "Telegram" } : undefined;
-            }
-            if (runtimeChannel === "signal") {
-              const resolved = resolveSignalReactionLevel({
-                cfg: params.config,
-                accountId: params.agentAccountId ?? undefined,
-              });
-              const level = resolved.agentReactionGuidance;
-              return level ? { level, channel: "Signal" } : undefined;
-            }
-            return undefined;
-          })()
+          if (runtimeChannel === "telegram") {
+            const resolved = resolveTelegramReactionLevel({
+              cfg: params.config,
+              accountId: params.agentAccountId ?? undefined,
+            });
+            const level = resolved.agentReactionGuidance;
+            return level ? { level, channel: "Telegram" } : undefined;
+          }
+          if (runtimeChannel === "signal") {
+            const resolved = resolveSignalReactionLevel({
+              cfg: params.config,
+              accountId: params.agentAccountId ?? undefined,
+            });
+            const level = resolved.agentReactionGuidance;
+            return level ? { level, channel: "Signal" } : undefined;
+          }
+          return undefined;
+        })()
         : undefined;
     const sandboxInfo = buildEmbeddedSandboxInfo(sandbox, params.bashElevated);
     const reasoningTagHint = isReasoningTagProvider(params.provider);
     // Resolve channel-specific message actions for system prompt
     const channelActions = runtimeChannel
       ? listChannelSupportedActions({
-          cfg: params.config,
-          channel: runtimeChannel,
-        })
+        cfg: params.config,
+        channel: runtimeChannel,
+      })
       : undefined;
     const messageToolHints = runtimeChannel
       ? resolveChannelMessageToolHints({
-          cfg: params.config,
-          channel: runtimeChannel,
-          accountId: params.agentAccountId,
-        })
+        cfg: params.config,
+        channel: runtimeChannel,
+        accountId: params.agentAccountId,
+      })
       : undefined;
 
     const defaultModelRef = resolveDefaultModelForAgent({
@@ -837,16 +837,16 @@ export async function runEmbeddedAttempt(
       });
       const clientToolDefs = params.clientTools
         ? toClientToolDefinitions(
-            params.clientTools,
-            (toolName, toolParams) => {
-              clientToolCallDetected = { name: toolName, params: toolParams };
-            },
-            {
-              agentId: sessionAgentId,
-              sessionKey: params.sessionKey,
-              loopDetection: clientToolLoopDetection,
-            },
-          )
+          params.clientTools,
+          (toolName, toolParams) => {
+            clientToolCallDetected = { name: toolName, params: toolParams };
+          },
+          {
+            agentId: sessionAgentId,
+            sessionKey: params.sessionKey,
+            loopDetection: clientToolLoopDetection,
+          },
+        )
         : [];
 
       const allCustomTools = [...customTools, ...clientToolDefs];
@@ -913,7 +913,11 @@ export async function runEmbeddedAttempt(
         activeSession.agent.streamFn = createOllamaStreamFn(ollamaBaseUrl);
       } else if (params.model.api === "deepseek-web") {
         const cookie = (await params.authStorage.getApiKey("deepseek-web")) || "";
-        activeSession.agent.streamFn = createDeepseekWebStreamFn(cookie);
+        activeSession.agent.streamFn = createDeepseekWebStreamFn(cookie, {
+          runId: params.runId,
+          sessionKey: params.sessionKey ?? params.sessionId,
+          streamDelayMs: 100,
+        });
       } else if (params.model.api === "qwen-web") {
         const credentials = (await params.authStorage.getApiKey("qwen-web")) || "";
         activeSession.agent.streamFn = createQwenWebStreamFn(credentials, params.streamParams);
@@ -1171,8 +1175,8 @@ export async function runEmbeddedAttempt(
             activeSession
               .steer(
                 `System Hook: You have been intercepted due to ${reason}. You are now in Reflection Mode (Z²). ` +
-                  "You are FORBIDDEN from calling any tools in this turn. " +
-                  "You must output a detailed analysis of the situation in a `<reflection>` block and propose a new approach (C) before proceeding.",
+                "You are FORBIDDEN from calling any tools in this turn. " +
+                "You must output a detailed analysis of the situation in a `<reflection>` block and propose a new approach (C) before proceeding.",
               )
               .catch((err) => {
                 log.error(`failed to inject reflection steering: ${String(err)}`);
@@ -1329,7 +1333,7 @@ export async function runEmbeddedAttempt(
           activeSession.agent.replaceMessages(sessionContext.messages);
           log.warn(
             `Removed orphaned user message to prevent consecutive user turns. ` +
-              `runId=${params.runId} sessionId=${params.sessionId}`,
+            `runId=${params.runId} sessionId=${params.sessionId}`,
           );
         }
 
@@ -1372,13 +1376,13 @@ export async function runEmbeddedAttempt(
             const sessionSummary = summarizeSessionContext(activeSession.messages);
             log.debug(
               `[context-diag] pre-prompt: sessionKey=${params.sessionKey ?? params.sessionId} ` +
-                `messages=${msgCount} roleCounts=${sessionSummary.roleCounts} ` +
-                `historyTextChars=${sessionSummary.totalTextChars} ` +
-                `maxMessageTextChars=${sessionSummary.maxMessageTextChars} ` +
-                `historyImageBlocks=${sessionSummary.totalImageBlocks} ` +
-                `systemPromptChars=${systemLen} promptChars=${promptLen} ` +
-                `promptImages=${imageResult.images.length} ` +
-                `provider=${params.provider}/${params.modelId} sessionFile=${params.sessionFile}`,
+              `messages=${msgCount} roleCounts=${sessionSummary.roleCounts} ` +
+              `historyTextChars=${sessionSummary.totalTextChars} ` +
+              `maxMessageTextChars=${sessionSummary.maxMessageTextChars} ` +
+              `historyImageBlocks=${sessionSummary.totalImageBlocks} ` +
+              `systemPromptChars=${systemLen} promptChars=${promptLen} ` +
+              `promptImages=${imageResult.images.length} ` +
+              `provider=${params.provider}/${params.modelId} sessionFile=${params.sessionFile}`,
             );
           }
 

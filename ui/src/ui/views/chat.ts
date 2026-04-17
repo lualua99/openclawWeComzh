@@ -334,20 +334,15 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
 
   if (props.stream !== null) {
     const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
-    if (props.stream.trim().length > 0) {
+    const hasText = props.stream.trim().length > 0;
+    const hasThinking = props.streamThinking?.trim();
+
+    if (hasText || hasThinking) {
       items.push({
         kind: "stream",
         key,
         text: props.stream,
         thinking: props.streamThinking ?? undefined,
-        startedAt: props.streamStartedAt ?? Date.now(),
-      });
-    } else if (props.streamThinking?.trim()) {
-      items.push({
-        kind: "stream",
-        key,
-        text: "",
-        thinking: props.streamThinking,
         startedAt: props.streamStartedAt ?? Date.now(),
       });
     } else {

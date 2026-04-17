@@ -201,7 +201,7 @@ export async function sendChatMessage(
     ];
     return null;
   } finally {
-    state.chatSending = false;
+    // chatSending 会在 handleChatEvent 收到 final/aborted 事件时设为 false
   }
 }
 
@@ -273,6 +273,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     state.chatStreamThinking = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatSending = false;
   } else if (payload.state === "aborted") {
     const normalizedMessage = normalizeAbortedAssistantMessage(payload.message);
     if (normalizedMessage) {
@@ -303,11 +304,13 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     state.chatStreamThinking = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatSending = false;
   } else if (payload.state === "error") {
     state.chatStream = null;
     state.chatStreamThinking = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    state.chatSending = false;
     state.lastError = payload.errorMessage ?? "chat error";
   }
   return payload.state;

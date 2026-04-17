@@ -271,7 +271,10 @@ function cleanupOldSessions(): void {
   }
 }
 
-export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
+export function createDeepseekWebStreamFn(
+  cookieOrJson: string,
+  contextInfo?: { runId?: string; sessionKey?: string; streamDelayMs?: number },
+): StreamFn {
   let options: string | DeepSeekWebClientOptions;
   try {
     const parsed = JSON.parse(cookieOrJson);
@@ -284,6 +287,9 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
     options = { cookie: cookieOrJson };
   }
   const client = new DeepSeekWebClient(options);
+  const defaultRunId = contextInfo?.runId;
+  const defaultSessionKey = contextInfo?.sessionKey;
+  const defaultStreamDelayMs = contextInfo?.streamDelayMs ?? 50;
 
   return (model, context, options) => {
     const stream = createAssistantMessageEventStream();
@@ -295,8 +301,8 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         cleanupOldSessions();
 
         const streamContext = context as unknown as DeepSeekStreamContext;
-        const sessionKey = streamContext.sessionId || "default";
-        const runId = streamContext.runId;
+        const sessionKey = streamContext.sessionId || defaultSessionKey || "default";
+        const runId = streamContext.runId || defaultRunId;
         let dsSessionId = sessionMap.get(sessionKey);
         let parentId = parentMessageMap.get(sessionKey);
 
@@ -384,6 +390,87 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
         const inputTokenCount = estimateTokens(prompt);
         let outputTokenCount = 0;
 
+        // Buffer for streamed text output
+        let textBuffer = "";
+        let lastFlushTime = 0;
+        let flushTimeout: ReturnType<typeof setTimeout> | null = null;
+        let thinkingBuffer = "";
+        let thinkingFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+
+        const flushTextBuffer = () => {
+          if (textBuffer.length === 0) return;
+          const flushedText = textBuffer;
+          textBuffer = "";
+          lastFlushTime = Date.now();
+
+          const key = "text";
+          let index = indexMap.get(key);
+          if (index === undefined) {
+            index = nextIndex++;
+            indexMap.set(key, index);
+            contentParts[index] = { type: "text", text: "" };
+            stream.push({ type: "text_start", contentIndex: index, partial: createPartial() });
+          }
+          (contentParts[index] as TextContent).text += flushedText;
+          accumulatedContentParts.push(flushedText);
+          outputTokenCount += Buffer.byteLength(flushedText, "utf8");
+          stream.push({
+            type: "text_delta",
+            contentIndex: index,
+            delta: flushedText,
+            text: flushedText,
+            partial: createPartial(),
+          } as any);
+          if (runId) {
+            const fullText = getAccumulatedContent();
+            emitAgentEvent({
+              runId,
+              stream: "assistant",
+              data: { text: fullText, delta: flushedText },
+              sessionKey: streamContext.sessionKey,
+            });
+          }
+        };
+
+        const flushThinkingBuffer = () => {
+          if (thinkingBuffer.length === 0) return;
+          const flushedThinking = thinkingBuffer;
+          thinkingBuffer = "";
+
+          const key = "thinking";
+          let index = indexMap.get(key);
+          if (index === undefined) {
+            index = nextIndex++;
+            indexMap.set(key, index);
+            contentParts[index] = { type: "thinking", thinking: "" };
+            stream.push({
+              type: "thinking_start",
+              contentIndex: index,
+              partial: createPartial(),
+            });
+            emitThinkingEvent("", true);
+          }
+          (contentParts[index] as ThinkingContent).thinking += flushedThinking;
+          accumulatedReasoningParts.push(flushedThinking);
+          stream.push({
+            type: "thinking_delta",
+            contentIndex: index,
+            delta: flushedThinking,
+          } as any);
+          const fullThinking = getAccumulatedReasoning();
+          emitThinkingEvent(fullThinking, false);
+        };
+
+        const scheduleTextFlush = () => {
+          if (textBuffer.length === 0) return;
+          flushTextBuffer();
+        };
+
+        const scheduleThinkingFlush = () => {
+          if (thinkingBuffer.length === 0) return;
+          flushThinkingBuffer();
+        };
+
         // Sequential indexing for pi-ai AssistantMessage events
         const indexMap = new Map<string, number>();
         let nextIndex = 0;
@@ -428,23 +515,29 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
             return;
           }
 
+          if (type === "text") {
+          const wasEmpty = textBuffer === "";
+          textBuffer += delta;
+          if (wasEmpty) {
+            flushTextBuffer();
+          } else {
+            scheduleTextFlush();
+          }
+          return;
+        }
+
+          if (type === "thinking") {
+            thinkingBuffer += delta;
+            scheduleThinkingFlush();
+            return;
+          }
+
           const key = type === "toolcall" ? `tool_${currentToolIndex}` : type;
           if (!indexMap.has(key)) {
             const index = nextIndex++;
             indexMap.set(key, index);
 
-            if (type === "text") {
-              contentParts[index] = { type: "text", text: "" };
-              stream.push({ type: "text_start", contentIndex: index, partial: createPartial() });
-            } else if (type === "thinking") {
-              contentParts[index] = { type: "thinking", thinking: "" };
-              stream.push({
-                type: "thinking_start",
-                contentIndex: index,
-                partial: createPartial(),
-              });
-              emitThinkingEvent("", true);
-            } else if (type === "toolcall") {
+            if (type === "toolcall") {
               const toolId = forceId || `call_${Date.now()}_${index}`;
               contentParts[index] = {
                 type: "toolCall",
@@ -468,27 +561,7 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
           }
 
           const index = indexMap.get(key)!;
-          if (type === "text") {
-            (contentParts[index] as TextContent).text += delta;
-            accumulatedContentParts.push(delta);
-            outputTokenCount += Buffer.byteLength(delta, "utf8");
-            stream.push({
-              type: "text_delta",
-              contentIndex: index,
-              delta,
-              partial: createPartial(),
-            });
-          } else if (type === "thinking") {
-            (contentParts[index] as ThinkingContent).thinking += delta;
-            accumulatedReasoningParts.push(delta);
-            stream.push({
-              type: "thinking_delta",
-              contentIndex: index,
-              delta,
-              partial: createPartial(),
-            });
-            emitThinkingEvent(getAccumulatedReasoning());
-          } else if (type === "toolcall") {
+          if (type === "toolcall") {
             accumulatedToolCalls[currentToolIndex].arguments += delta;
             stream.push({
               type: "toolcall_delta",
@@ -804,6 +877,18 @@ export function createDeepseekWebStreamFn(cookieOrJson: string): StreamFn {
             processLine(part.trim());
           }
         }
+
+        // Flush remaining buffers before finishing
+        if (flushTimeout) {
+          clearTimeout(flushTimeout);
+          flushTimeout = null;
+        }
+        flushTextBuffer();
+        if (thinkingFlushTimeout) {
+          clearTimeout(thinkingFlushTimeout);
+          thinkingFlushTimeout = null;
+        }
+        flushThinkingBuffer();
 
         const totalTokens = inputTokenCount + Math.ceil(outputTokenCount / 4);
         console.log(

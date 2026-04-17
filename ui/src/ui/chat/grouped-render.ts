@@ -83,6 +83,11 @@ export function renderStreamingGroup(
   });
   const name = assistant?.name ?? "Assistant";
 
+  const hasContent = (thinking?.trim().length ?? 0) > 0 || (text?.trim().length ?? 0) > 0;
+  if (!hasContent) {
+    return null;
+  }
+
   return html`
     <div class="chat-group assistant">
       ${renderAvatar("assistant", assistant)}

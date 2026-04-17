@@ -300,10 +300,6 @@ export function createAgentEventHandler({
       return;
     }
     const now = Date.now();
-    const last = chatRunState.deltaSentAt.get(clientRunId) ?? 0;
-    if (now - last < 50) {
-      return;
-    }
     chatRunState.deltaSentAt.set(clientRunId, now);
     const payload = {
       runId: clientRunId,
@@ -332,12 +328,6 @@ export function createAgentEventHandler({
       return;
     }
     const now = Date.now();
-    if (!isStart) {
-      const last = chatRunState.thinkingDeltaSentAt.get(clientRunId) ?? 0;
-      if (now - last < 50) {
-        return;
-      }
-    }
     chatRunState.thinkingDeltaSentAt.set(clientRunId, now);
     const payload = {
       runId: clientRunId,
