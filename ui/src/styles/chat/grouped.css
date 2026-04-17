@@ -7,10 +7,23 @@
   display: flex;
   gap: 10px;
   align-items: flex-end;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   padding: 0 8px;
   max-width: 860px;
   width: 100%;
+}
+
+/* Same role continuous messages more compact */
+.chat-group.assistant + .chat-group.assistant,
+.chat-group.user + .chat-group.user {
+  margin-top: -4px;
+  margin-bottom: 12px;
+}
+
+/* Different role switch keep standard spacing */
+.chat-group.assistant + .chat-group.user,
+.chat-group.user + .chat-group.assistant {
+  margin-top: 8px;
 }
 
 /* User messages on right */
@@ -24,11 +37,12 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-width: min(600px, calc(100% - 52px));
+  max-width: min(550px, calc(100% - 52px));
 }
 
-/* User messages align content right */
+/* User messages narrower width */
 .chat-group.user .chat-group-messages {
+  max-width: min(450px, calc(100% - 52px));
   align-items: flex-end;
 }
 
@@ -113,8 +127,9 @@
   font-weight: 600;
   font-size: 14px;
   flex-shrink: 0;
-  align-self: flex-end;
-  margin-bottom: 20px;
+  align-self: flex-start;
+  margin-top: 8px;
+  margin-bottom: 0;
   color: #64748b;
 }
 
@@ -437,4 +452,52 @@ img.chat-avatar {
     transform: scale(1);
     opacity: 1;
   }
+}
+
+/* ========================
+   Code Block Styles
+   ======================== */
+
+.chat-bubble pre {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--secondary, #f1f5f9);
+  padding: 12px;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.chat-bubble code {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9em;
+  background: var(--secondary, #f1f5f9);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+:root[data-theme="dark"] .chat-bubble pre {
+  background: #1e1e1e;
+  border: 1px solid #333;
+}
+
+:root[data-theme="dark"] .chat-bubble code {
+  background: #2a2a2a;
+}
+
+/* ========================
+   Blockquote Styles
+   ======================== */
+
+.chat-bubble blockquote {
+  margin: 8px 0;
+  padding: 6px 0 6px 12px;
+  border-left: 3px solid var(--accent, #3b82f6);
+  color: var(--muted, #64748b);
+  font-style: italic;
+}
+
+:root[data-theme="dark"] .chat-bubble blockquote {
+  border-left-color: #60a5fa;
+  color: #9ca3af;
 }

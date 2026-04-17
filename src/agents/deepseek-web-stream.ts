@@ -700,7 +700,7 @@ export function createDeepseekWebStreamFn(
                       part.arguments = { raw: argStr };
                     }
                     const argsStr = JSON.stringify(part.arguments);
-                    console.log(`\x1b[33m🔧 ${part.name}: ${argsStr.length > 60 ? argsStr.slice(0, 60) + "..." : argsStr}\x1b[0m`);
+                    console.log(`\x1b[33m🔧 ${part.name}: ${argsStr.length > 250 ? argsStr.slice(0, 250) + "..." : argsStr}\x1b[0m`);
                     stream.push({
                       type: "toolcall_end",
                       contentIndex: index,
@@ -896,14 +896,14 @@ export function createDeepseekWebStreamFn(
         const outputTokens = Math.ceil(outputTokenCount / 4);
         const totalTokens = inputTokenCount + outputTokens;
         const stopReason = finalContent.some((p) => p.type === "toolCall") ? "toolUse" : "stop";
-        
+
         const toolCallParts = finalContent.filter((p) => p.type === "toolCall");
         let toolInfo = "";
         if (toolCallParts.length > 0) {
           const toolSummary = toolCallParts.map(p => `${p.name}:${p.id}`).join(", ");
           toolInfo = ` | 工具: ${toolSummary}`;
         }
-        
+
         console.log(
           `✅ 结束 | in: ${inputTokenCount} | out: ${outputTokens} | total: ${totalTokens} | ${stopReason}${toolInfo}`,
         );

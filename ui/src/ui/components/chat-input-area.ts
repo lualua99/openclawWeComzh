@@ -1,5 +1,5 @@
-import { LitElement, html, css, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { LitElement, html, css, nothing, type PropertyValues } from "lit";
+import { customElement, property, query } from "lit/decorators.js";
 import { icons } from "../icons.ts";
 import { detectTextDirection } from "../text-direction.ts";
 import { t } from "../../i18n/index.ts";
@@ -12,6 +12,8 @@ export class ChatInputArea extends LitElement {
   @property({ type: Boolean }) sending = false;
   @property({ type: Boolean }) canAbort = false;
   @property({ type: Array }) attachments: ChatAttachment[] = [];
+
+  @query("textarea") private textareaElement!: HTMLTextAreaElement;
 
   static styles = css`
     :host {
@@ -176,6 +178,14 @@ export class ChatInputArea extends LitElement {
     return `att-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   }
 
+  updated(changedProperties: PropertyValues) {
+    if (changedProperties.has("draft") && this.textareaElement) {
+      if (this.draft === "" || this.draft === null || this.draft === undefined) {
+        this.textareaElement.style.height = "";
+      }
+    }
+  }
+
   private handlePaste = (e: ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) {return;}
@@ -217,8 +227,12 @@ export class ChatInputArea extends LitElement {
   };
 
   private adjustTextareaHeight(el: HTMLTextAreaElement) {
-    el.style.height = "";
-    el.style.height = `${el.scrollHeight}px`;
+    if (!el.value || el.value === "") {
+      el.style.height = "";
+    } else {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
   }
 
   render() {

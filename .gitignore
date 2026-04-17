@@ -133,3 +133,4 @@ dist/protocol.schema.json
 # Synthing
 **/.stfolder/
 .trae/rules/project-rules.md
+.trae/rules/minimax-2.5-coding-rules.md
