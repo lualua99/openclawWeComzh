@@ -7,6 +7,14 @@ import { resolveAndPersistSessionFile } from "./session-file.js";
 import { loadSessionStore } from "./store.js";
 import type { SessionEntry } from "./types.js";
 
+function formatTime(): string {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, "0");
+  const m = String(now.getMinutes()).padStart(2, "0");
+  const s = String(now.getSeconds()).padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
+
 function stripQuery(value: string): string {
   const noHash = value.split("#")[0] ?? value;
   return noHash.split("?")[0] ?? noHash;
@@ -154,5 +162,6 @@ export async function appendAssistantMessageToSessionTranscript(params: {
   });
 
   emitSessionTranscriptUpdate(sessionFile);
+  console.log(`[${formatTime()}] 💾 会话已保存至：${path.basename(sessionFile)}`);
   return { ok: true, sessionFile };
 }

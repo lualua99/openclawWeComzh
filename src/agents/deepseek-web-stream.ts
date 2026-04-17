@@ -14,6 +14,19 @@ import {
 } from "../providers/deepseek-web-client.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
 
+function formatTime(): string {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, "0");
+  const m = String(now.getMinutes()).padStart(2, "0");
+  const s = String(now.getSeconds()).padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
+
+function getShortSessionId(sessionKey: string): string {
+  if (sessionKey.length <= 8) return sessionKey;
+  return sessionKey.slice(0, 4) + ".." + sessionKey.slice(-4);
+}
+
 interface DeepseekStreamOptions {
   searchEnabled?: boolean;
   preempt?: boolean;
@@ -112,9 +125,6 @@ function buildPrompt(
     }
 
     if (systemPromptContent && !messages.some((m) => m.role === "system")) {
-      console.log(
-        `[DeepseekWebStream] 📋 附加系统提示 (长度=${systemPromptContent.length})`,
-      );
       historyParts.push(`System: ${systemPromptContent}`);
     }
 
@@ -144,9 +154,6 @@ function buildPrompt(
         content = String(m.content);
       }
 
-      console.log(
-        `[DeepseekWebStream] 💬 消息[${messages.indexOf(m)}] 角色=${m.role} 长度=${content.length} 预览=${content.slice(0, 30).replace(/\n/g, " ")}`,
-      );
       historyParts.push(`${role}: ${content}`);
     }
 
@@ -317,16 +324,8 @@ export function createDeepseekWebStreamFn(
         const messages = streamContext.messages;
         const systemPrompt = streamContext.systemPrompt;
         const tools = streamContext.tools;
-        console.log(
-          `[DeepseekWebStream] 📝 消息数: ${messages.length}, 系统提示: ${systemPrompt ? "有" : "无"}`,
-        );
 
         const prompt = buildPrompt(messages, systemPrompt, tools, sessionKey, parentMessageMap);
-
-        console.log(
-          `[DeepseekWebStream] 🚀 开始对话 | 会话: ${sessionKey.slice(0, 8)}... | 提示长度: ${prompt.length}`,
-        );
-        console.log(`[DeepseekWebStream] 📄 提示预览: ${prompt.slice(0, 80)}...`);
 
         if (!prompt) {
           console.error(`[DeepseekWebStream] ❌ 无可发送的消息:`, JSON.stringify(messages));
@@ -338,6 +337,15 @@ export function createDeepseekWebStreamFn(
         const searchEnabled = streamOptions.searchEnabled ?? true;
         const preempt = streamOptions.preempt ?? false;
         const fileIds = streamOptions.fileIds || [];
+
+        const estimateTokens = (text: string): number => {
+          return Math.ceil(Buffer.byteLength(text, "utf8") / 4);
+        };
+
+        const inputTokenCount = estimateTokens(prompt);
+        console.log(
+          `[${formatTime()}] 🚀 会话启动 | 会话ID: ${getShortSessionId(sessionKey)} | 提示token: ${inputTokenCount}`,
+        );
 
         const responseStream = await client.chatCompletions({
           sessionId: dsSessionId,
@@ -383,11 +391,6 @@ export function createDeepseekWebStreamFn(
           });
         };
 
-        const estimateTokens = (text: string): number => {
-          return Math.ceil(Buffer.byteLength(text, "utf8") / 4);
-        };
-
-        const inputTokenCount = estimateTokens(prompt);
         let outputTokenCount = 0;
 
         // Buffer for streamed text output
@@ -516,15 +519,15 @@ export function createDeepseekWebStreamFn(
           }
 
           if (type === "text") {
-          const wasEmpty = textBuffer === "";
-          textBuffer += delta;
-          if (wasEmpty) {
-            flushTextBuffer();
-          } else {
-            scheduleTextFlush();
+            const wasEmpty = textBuffer === "";
+            textBuffer += delta;
+            if (wasEmpty) {
+              flushTextBuffer();
+            } else {
+              scheduleTextFlush();
+            }
+            return;
           }
-          return;
-        }
 
           if (type === "thinking") {
             thinkingBuffer += delta;
@@ -890,18 +893,10 @@ export function createDeepseekWebStreamFn(
         }
         flushThinkingBuffer();
 
-        const totalTokens = inputTokenCount + Math.ceil(outputTokenCount / 4);
-        console.log(
-          `[DeepseekWebStream] ✅ 对话完成 | 内容: ${getAccumulatedContent().length}字符 | 思考: ${getAccumulatedReasoning().length}字符 | 工具调用: ${accumulatedToolCalls.length} | 输入: ${inputTokenCount} | 输出: ${Math.ceil(outputTokenCount / 4)} | 总计: ${totalTokens}`,
-        );
-
-        // Filter internal tools from final message as per original logic,
-        // but keep them in the stream parts for UI continuity.
         const finalContent = contentParts.filter((part) => {
           if (part.type === "toolCall") {
             return !INTERNAL_TOOLS.has(part.name);
           }
-          // Filter out empty thinking/text if they are totally empty to keep final message clean
           if (part.type === "thinking" && !part.thinking) {
             return false;
           }
@@ -910,6 +905,13 @@ export function createDeepseekWebStreamFn(
           }
           return true;
         });
+
+        const outputTokens = Math.ceil(outputTokenCount / 4);
+        const totalTokens = inputTokenCount + outputTokens;
+        const stopReason = finalContent.some((p) => p.type === "toolCall") ? "toolUse" : "stop";
+        console.log(
+          `[${formatTime()}] ✅ 会话结束 | 输入token: ${inputTokenCount} | 输出token: ${outputTokens} | 总token: ${totalTokens} | stopReason: ${stopReason}`,
+        );
 
         const assistantMessage: AssistantMessage = {
           role: "assistant",
