@@ -228,7 +228,8 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0;
-  background: var(--bg-elevated);
+  background:
+    linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-accent) 100%);
   border-right: 1px solid var(--border);
   scrollbar-width: none;
   transition:

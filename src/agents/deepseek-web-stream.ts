@@ -14,14 +14,6 @@ import {
 } from "../providers/deepseek-web-client.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
 
-function formatTime(): string {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2, "0");
-  const m = String(now.getMinutes()).padStart(2, "0");
-  const s = String(now.getSeconds()).padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
 function getShortSessionId(sessionKey: string): string {
   if (sessionKey.length <= 8) return sessionKey;
   return sessionKey.slice(0, 4) + ".." + sessionKey.slice(-4);
@@ -261,7 +253,7 @@ function cleanupOldSessions(): void {
       sessionMap.delete(key);
       parentMessageMap.delete(key);
       sessionTimestampMap.delete(key);
-      console.log(`[DeepseekWebStream] 🧹 清理过期会话: ${key}`);
+      console.log(`🧹 清理 | 过期: ${key.slice(0, 8)}`);
     }
   }
 
@@ -273,7 +265,7 @@ function cleanupOldSessions(): void {
       sessionMap.delete(key);
       parentMessageMap.delete(key);
       sessionTimestampMap.delete(key);
-      console.log(`[DeepseekWebStream] 🧹 清理LRU会话: ${key}`);
+      console.log(`🧹 清理 | LRU: ${key.slice(0, 8)}`);
     }
   }
 }
@@ -344,7 +336,7 @@ export function createDeepseekWebStreamFn(
 
         const inputTokenCount = estimateTokens(prompt);
         console.log(
-          `[${formatTime()}] 🚀 会话启动 | 会话ID: ${getShortSessionId(sessionKey)} | 提示token: ${inputTokenCount}`,
+          `🚀 启动 | ${getShortSessionId(sessionKey)} | prompt: ${inputTokenCount}`,
         );
 
         const responseStream = await client.chatCompletions({
@@ -594,7 +586,6 @@ export function createDeepseekWebStreamFn(
           }
 
           if (JUNK_TOKENS.has(delta)) {
-            console.log(`[DeepseekWebStream] 🗑️ 过滤垃圾token: ${delta}`);
             return;
           }
 
@@ -683,16 +674,13 @@ export function createDeepseekWebStreamFn(
               } else if (first.type === "tool_call_start") {
                 const attrs = first as { id?: string | null; name?: string };
                 const toolName = attrs.name || "";
-                console.log(`[DeepseekWebStream] 🔧 检测到工具调用开始: name=${toolName}, id=${attrs.id}, tagBuffer前20字符: ${tagBuffer.slice(0, 20)}`);
                 if (INTERNAL_TOOLS.has(toolName)) {
-                  console.log(`[DeepseekWebStream] ⏭️ 跳过内部工具: ${toolName}`);
                   skippingInternalTool = true;
                   currentMode = "text";
                 } else {
                   currentMode = "tool_call";
                   currentToolName = toolName;
                   const toolId = attrs.id || `call_${Date.now()}_${currentToolIndex}`;
-                  console.log(`[DeepseekWebStream] ✅ 开始解析工具调用: name=${toolName}, id=${toolId}`);
                   emitDelta("toolcall", "", toolId);
                 }
               } else if (first.type === "tool_call_end") {
@@ -709,11 +697,10 @@ export function createDeepseekWebStreamFn(
                     try {
                       part.arguments = JSON.parse(argStr);
                     } catch (e) {
-                      console.log(`[DeepseekWebStream] ⚠️ 工具参数解析错误: ${e instanceof Error ? e.message : String(e)}, 原始: ${argStr.slice(0, 100)}`);
                       part.arguments = { raw: argStr };
                     }
                     const argsStr = JSON.stringify(part.arguments);
-                    console.log(`\x1b[33m[DeepseekWebStream] 🔧 工具调用: ${part.name}, 参数: ${argsStr.length > 100 ? argsStr.slice(0, 100) + "..." : argsStr}\x1b[0m`);
+                    console.log(`\x1b[33m🔧 ${part.name}: ${argsStr.length > 60 ? argsStr.slice(0, 60) + "..." : argsStr}\x1b[0m`);
                     stream.push({
                       type: "toolcall_end",
                       contentIndex: index,
@@ -843,7 +830,7 @@ export function createDeepseekWebStreamFn(
                 }
               }
             } catch (e) {
-              console.log(`[DeepseekWebStream] ⚠️ JSON解析错误: ${e instanceof Error ? e.message : String(e)}, 数据: ${dataStr.slice(0, 100)}`);
+              console.log(`⚠️ JSON错误: ${e instanceof Error ? e.message : String(e)}`);
             }
           }
         };
@@ -909,8 +896,16 @@ export function createDeepseekWebStreamFn(
         const outputTokens = Math.ceil(outputTokenCount / 4);
         const totalTokens = inputTokenCount + outputTokens;
         const stopReason = finalContent.some((p) => p.type === "toolCall") ? "toolUse" : "stop";
+        
+        const toolCallParts = finalContent.filter((p) => p.type === "toolCall");
+        let toolInfo = "";
+        if (toolCallParts.length > 0) {
+          const toolSummary = toolCallParts.map(p => `${p.name}:${p.id}`).join(", ");
+          toolInfo = ` | 工具: ${toolSummary}`;
+        }
+        
         console.log(
-          `[${formatTime()}] ✅ 会话结束 | 输入token: ${inputTokenCount} | 输出token: ${outputTokens} | 总token: ${totalTokens} | stopReason: ${stopReason}`,
+          `✅ 结束 | in: ${inputTokenCount} | out: ${outputTokens} | total: ${totalTokens} | ${stopReason}${toolInfo}`,
         );
 
         const assistantMessage: AssistantMessage = {
@@ -932,12 +927,6 @@ export function createDeepseekWebStreamFn(
         };
         (assistantMessage as unknown as { thinking_enabled: boolean }).thinking_enabled =
           !!getAccumulatedReasoning();
-
-        const toolCallParts = assistantMessage.content.filter(p => p.type === "toolCall");
-        console.log(`[DeepseekWebStream] 📤 发送done事件: stopReason=${assistantMessage.stopReason}, 内容数量=${assistantMessage.content.length}, toolCall数量=${toolCallParts.length}`);
-        if (toolCallParts.length > 0) {
-          console.log(`[DeepseekWebStream] 📋 工具调用列表:`, toolCallParts.map(p => ({ name: p.name, id: p.id })));
-        }
 
         stream.push({
           type: "done",

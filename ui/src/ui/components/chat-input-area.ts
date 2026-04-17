@@ -217,7 +217,7 @@ export class ChatInputArea extends LitElement {
   };
 
   private adjustTextareaHeight(el: HTMLTextAreaElement) {
-    el.style.height = "auto";
+    el.style.height = "";
     el.style.height = `${el.scrollHeight}px`;
   }
 

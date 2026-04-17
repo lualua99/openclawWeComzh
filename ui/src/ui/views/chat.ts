@@ -98,7 +98,7 @@ const COMPACTION_TOAST_DURATION_MS = 5000;
 const FALLBACK_TOAST_DURATION_MS = 8000;
 
 function adjustTextareaHeight(el: HTMLTextAreaElement) {
-  el.style.height = "auto";
+  el.style.height = "";
   el.style.height = `${el.scrollHeight}px`;
 }
 
@@ -182,54 +182,53 @@ export function renderChat(props: ChatProps) {
   return html`
     <chat-layout .props=${props}>
       <div slot="messages" style="display: contents;">
-        ${
-          props.loading
-            ? html`
+        ${props.loading
+      ? html`
                 <div class="muted">Loading chat…</div>
               `
-            : nothing
-        }
+      : nothing
+    }
         ${repeat(
-          buildChatItems(props),
-          (item) => item.key,
-          (item) => {
-            if (item.kind === "divider") {
-              return html`
+      buildChatItems(props),
+      (item) => item.key,
+      (item) => {
+        if (item.kind === "divider") {
+          return html`
                 <div class="chat-divider" role="separator" data-ts=${String(item.timestamp)}>
                   <span class="chat-divider__line"></span>
                   <span class="chat-divider__label">${item.label}</span>
                   <span class="chat-divider__line"></span>
                 </div>
               `;
-            }
+        }
 
-            if (item.kind === "reading-indicator") {
-              return renderReadingIndicatorGroup(assistantIdentity);
-            }
+        if (item.kind === "reading-indicator") {
+          return renderReadingIndicatorGroup(assistantIdentity);
+        }
 
-            if (item.kind === "stream") {
-              return renderStreamingGroup(
-                item.text,
-                item.startedAt,
-                props.onOpenSidebar,
-                assistantIdentity,
-                item.thinking,
-                showReasoning,
-              );
-            }
+        if (item.kind === "stream") {
+          return renderStreamingGroup(
+            item.text,
+            item.startedAt,
+            props.onOpenSidebar,
+            assistantIdentity,
+            item.thinking,
+            showReasoning,
+          );
+        }
 
-            if (item.kind === "group") {
-              return renderMessageGroup(item, {
-                onOpenSidebar: props.onOpenSidebar,
-                showReasoning,
-                assistantName: props.assistantName,
-                assistantAvatar: assistantIdentity.avatar,
-              });
-            }
+        if (item.kind === "group") {
+          return renderMessageGroup(item, {
+            onOpenSidebar: props.onOpenSidebar,
+            showReasoning,
+            assistantName: props.assistantName,
+            assistantAvatar: assistantIdentity.avatar,
+          });
+        }
 
-            return nothing;
-          },
-        )}
+        return nothing;
+      },
+    )}
       </div>
     </chat-layout>
   `;
@@ -334,20 +333,21 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
 
   if (props.stream !== null) {
     const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
-    const hasText = props.stream.trim().length > 0;
-    const hasThinking = props.streamThinking?.trim();
+    items.push({
+      kind: "stream",
+      key,
+      text: props.stream,
+      thinking: props.streamThinking ?? undefined,
+      startedAt: props.streamStartedAt ?? Date.now(),
+    });
+  }
 
-    if (hasText || hasThinking) {
-      items.push({
-        kind: "stream",
-        key,
-        text: props.stream,
-        thinking: props.streamThinking ?? undefined,
-        startedAt: props.streamStartedAt ?? Date.now(),
-      });
-    } else {
-      items.push({ kind: "reading-indicator", key });
-    }
+  if (props.sending && !props.stream) {
+    const key = `reading:${props.sessionKey}:${props.streamStartedAt ?? Date.now()}`;
+    items.push({
+      kind: "reading-indicator",
+      key,
+    });
   }
 
   return groupMessages(items);

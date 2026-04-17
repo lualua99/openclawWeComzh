@@ -85,7 +85,7 @@ export function renderStreamingGroup(
 
   const hasContent = (thinking?.trim().length ?? 0) > 0 || (text?.trim().length ?? 0) > 0;
   if (!hasContent) {
-    return null;
+    return renderReadingIndicatorGroup(assistant);
   }
 
   return html`
