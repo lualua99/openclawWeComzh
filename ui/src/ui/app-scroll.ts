@@ -284,12 +284,16 @@ export class ScrollRestoration {
     if (saved && container) {
       try {
         const data: ScrollPositionData = JSON.parse(saved);
-        const targetScrollTop = data.scrollTop;
-        console.log(`[ScrollRestoration] Attempting to restore scroll position: ${targetScrollTop}`);
-        this.restoreWithRetry(container, targetScrollTop);
+        console.log(`[ScrollRestoration] Saved position was ${data.scrollTop}, overriding to bottom`);
       } catch (e) {
-        console.error("[ScrollRestoration] Failed to parse saved scroll position:", e);
+        // ignore parse error
       }
+    }
+    // Force scroll to bottom
+    if (container) {
+      const targetScrollTop = container.scrollHeight;
+      console.log(`[ScrollRestoration] Scrolling to bottom on refresh: ${targetScrollTop}`);
+      this.restoreWithRetry(container, targetScrollTop);
     }
   }
 
