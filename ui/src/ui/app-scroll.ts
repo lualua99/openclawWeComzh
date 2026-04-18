@@ -280,27 +280,26 @@ export class ScrollRestoration {
     if (this.hasRestored) {
       return;
     }
-    const saved = sessionStorage.getItem(SCROLL_POSITION_KEY);
-    if (saved && container) {
-      try {
-        const data: ScrollPositionData = JSON.parse(saved);
-        console.log(`[ScrollRestoration] Saved position was ${data.scrollTop}, overriding to bottom`);
-      } catch (e) {
-        // ignore parse error
+    // Ignore the passed container, use page scrolling element directly
+    const targetContainer = document.scrollingElement || document.body || document.documentElement;
+
+    setTimeout(() => {
+      if (targetContainer) {
+        targetContainer.scrollTop = targetContainer.scrollHeight;
+        console.log("[ScrollRestoration] Force scroll to bottom:", targetContainer.scrollHeight);
       }
-    }
-    // Force scroll to bottom
-    if (container) {
-      const targetScrollTop = container.scrollHeight;
-      console.log(`[ScrollRestoration] Scrolling to bottom on refresh: ${targetScrollTop}`);
-      this.restoreWithRetry(container, targetScrollTop);
-    }
+    }, 200);
+
+    // Clear saved position to avoid interference
+    sessionStorage.removeItem("chat-scroll-position");
   }
 
   private restoreWithRetry(container: HTMLElement, targetScrollTop?: number): void {
     let attempts = 0;
     const maxAttempts = MAX_RETRY_ATTEMPTS;
 
+    // 如果没有传入目标位置，才从 sessionStorage 读取
+    // 注意：刷新时 restore 方法已经传入了 container.scrollHeight，所以不会走这个分支
     if (targetScrollTop === undefined) {
       const saved = sessionStorage.getItem(SCROLL_POSITION_KEY);
       if (!saved) {
@@ -309,10 +308,13 @@ export class ScrollRestoration {
       try {
         const data: ScrollPositionData = JSON.parse(saved);
         targetScrollTop = data.scrollTop;
+        console.log(`[ScrollRestoration] No target provided, using saved position: ${targetScrollTop}`);
       } catch (e) {
         console.error("[ScrollRestoration] Failed to parse saved scroll position:", e);
         return;
       }
+    } else {
+      console.log(`[ScrollRestoration] Using provided target: ${targetScrollTop}`);
     }
 
     const tryRestore = () => {

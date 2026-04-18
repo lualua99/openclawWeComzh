@@ -418,6 +418,15 @@ export async function handleToolExecutionEnd(
       },
     });
 
+    if (isToolError) {
+      const errorMsg = extractToolErrorMessage(sanitizedResult) || "Unknown error";
+      console.log(`\x1b[31m❌ ${toolName}: ${errorMsg.slice(0, 100)}${errorMsg.length > 100 ? "..." : ""}\x1b[0m`);
+    } else {
+      const resultText = extractToolResultText(sanitizedResult);
+      const resultPreview = resultText ? resultText.slice(0, 100) : "(no output)";
+      console.log(`\x1b[32m✓ ${toolName}: ${resultPreview}${resultText && resultText.length > 100 ? "..." : ""}\x1b[0m`);
+    }
+
     ctx.log.debug(
       `embedded run tool end: runId=${ctx.params.runId} tool=${toolName} toolCallId=${toolCallId}`,
     );
