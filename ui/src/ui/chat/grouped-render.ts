@@ -259,16 +259,18 @@ function renderGroupedMessage(
     "chat-bubble",
     canCopyMarkdown ? "has-copy" : "",
     opts.isStreaming ? "streaming" : "",
-    "chat-bubble--anim-enter", // New class for animation
+    "chat-bubble--anim-enter",
   ]
     .filter(Boolean)
     .join(" ");
+
+  const shouldShowThinking = opts.showReasoning && role === "assistant" && (extractedThinking || opts.isStreaming);
 
   if (!markdown && hasToolCards && isToolResult) {
     return html`${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}`;
   }
 
-  if (!markdown && !hasToolCards && !hasImages) {
+  if (!markdown && !hasToolCards && !hasImages && !shouldShowThinking) {
     return nothing;
   }
 
@@ -277,8 +279,8 @@ function renderGroupedMessage(
       ${canCopyMarkdown && markdown ? renderCopyAsMarkdownButton(markdown) : nothing}
       ${renderMessageImages(images)}
       ${
-        extractedThinking && opts.showReasoning
-          ? html`<chat-thinking .content=${extractedThinking} .isStreaming=${opts.isStreaming}></chat-thinking>`
+        shouldShowThinking
+          ? html`<chat-thinking .content=${extractedThinking ?? ""} .isStreaming=${opts.isStreaming}></chat-thinking>`
           : nothing
       }
       ${

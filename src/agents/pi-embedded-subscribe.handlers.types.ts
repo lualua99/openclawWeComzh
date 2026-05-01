@@ -85,6 +85,11 @@ export type EmbeddedPiSubscribeState = {
   chaosScore: number;
   /** Multi-agent Cognitive Loop Fusion: fingerprint of the last tool action for repetition detection */
   lastActionFingerprint?: string;
+
+  /** Track pending tool call IDs for batch sending */
+  pendingToolCallIds: Set<string>;
+  /** Buffer for tool results to be sent in batch */
+  toolResultsBuffer: Array<{ text?: string; mediaUrls?: string[] }>;
 };
 
 export type EmbeddedPiSubscribeContext = {
@@ -131,6 +136,9 @@ export type EmbeddedPiSubscribeContext = {
   incrementCompactionCount: () => void;
   getUsageTotals: () => NormalizedUsage | undefined;
   getCompactionCount: () => number;
+  flushToolResultsBuffer: () => void;
+  pendingToolCallIds: Set<string>;
+  toolResultsBuffer: Array<{ text?: string; mediaUrls?: string[] }>;
 };
 
 /**
@@ -161,6 +169,8 @@ export type ToolHandlerState = Pick<
   | "iterationDepth"
   | "chaosScore"
   | "lastActionFingerprint"
+  | "pendingToolCallIds"
+  | "toolResultsBuffer"
 >;
 
 export type ToolHandlerContext = {
@@ -174,6 +184,9 @@ export type ToolHandlerContext = {
   emitToolSummary: (toolName?: string, meta?: string) => void;
   emitToolOutput: (toolName?: string, meta?: string, output?: string) => void;
   trimMessagingToolSent: () => void;
+  flushToolResultsBuffer: () => void;
+  pendingToolCallIds: Set<string>;
+  toolResultsBuffer: Array<{ text?: string; mediaUrls?: string[] }>;
 };
 
 export type EmbeddedPiSubscribeEvent =

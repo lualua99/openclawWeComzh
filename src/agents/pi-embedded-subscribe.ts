@@ -82,6 +82,8 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     iterationDepth: params.iterationDepth ?? 0,
     chaosScore: 0,
     lastActionFingerprint: undefined,
+    pendingToolCallIds: new Set<string>(),
+    toolResultsBuffer: [],
   };
   const usageTotals = {
     input: 0,
@@ -102,6 +104,8 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
   const messagingToolSentMediaUrls = state.messagingToolSentMediaUrls;
   const pendingMessagingTexts = state.pendingMessagingTexts;
   const pendingMessagingTargets = state.pendingMessagingTargets;
+  const pendingToolCallIds = state.pendingToolCallIds;
+  const toolResultsBuffer = state.toolResultsBuffer;
   const replyDirectiveAccumulator = createStreamingDirectiveAccumulator();
   const partialReplyDirectiveAccumulator = createStreamingDirectiveAccumulator();
 
@@ -321,6 +325,21 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     }
     return `\`\`\`txt\n${trimmed}\n\`\`\``;
   };
+
+  const flushToolResultsBuffer = () => {
+    if (toolResultsBuffer.length === 0) {
+      return;
+    }
+    for (const buffered of toolResultsBuffer) {
+      try {
+        void params.onToolResult?.(buffered);
+      } catch {
+        // ignore delivery failures
+      }
+    }
+    toolResultsBuffer.length = 0;
+  };
+
   const emitToolResultMessage = (toolName: string | undefined, message: string) => {
     if (!params.onToolResult) {
       return;
@@ -330,14 +349,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     if (!cleanedText && filteredMediaUrls.length === 0) {
       return;
     }
-    try {
-      void params.onToolResult({
-        text: cleanedText,
-        mediaUrls: filteredMediaUrls.length ? filteredMediaUrls : undefined,
-      });
-    } catch {
-      // ignore tool result delivery failures
-    }
+    const payload = {
+      text: cleanedText,
+      mediaUrls: filteredMediaUrls.length ? filteredMediaUrls : undefined,
+    };
+    toolResultsBuffer.push(payload);
   };
   const emitToolSummary = (toolName?: string, meta?: string) => {
     const agg = formatToolAggregate(toolName, meta ? [meta] : undefined, {
@@ -629,6 +645,9 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     incrementCompactionCount,
     getUsageTotals,
     getCompactionCount: () => compactionCount,
+    flushToolResultsBuffer,
+    pendingToolCallIds,
+    toolResultsBuffer,
   };
 
   const sessionUnsubscribe = params.session.subscribe(createEmbeddedPiSessionEventHandler(ctx));
@@ -686,6 +705,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     resetConsecutiveToolErrors: () => {
       state.consecutiveToolErrors = 0;
     },
+    flushToolResultsBuffer,
     getUsageTotals,
     getCompactionCount: () => compactionCount,
     waitForCompactionRetry: () => {

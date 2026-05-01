@@ -167,6 +167,7 @@ export class ThinkingParser {
             isComplete: true,
           });
         }
+        this.accumulatedContent = "";
         this.isInThinking = false;
       }
 

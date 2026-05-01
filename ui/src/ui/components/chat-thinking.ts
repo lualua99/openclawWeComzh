@@ -197,7 +197,8 @@ export class ChatThinking extends LitElement {
   }
 
   render() {
-    if (!this.content.trim()) {
+    // During streaming, show skeleton loader even if content is empty
+    if (!this.content.trim() && !this.isStreaming) {
       return nothing;
     }
 

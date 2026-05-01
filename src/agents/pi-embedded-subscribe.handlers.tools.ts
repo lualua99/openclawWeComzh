@@ -154,17 +154,12 @@ function emitToolResultOutput(params: {
     return;
   }
 
-  // emitToolOutput() already handles MEDIA: directives when enabled; this path
-  // only sends raw media URLs for non-verbose delivery mode.
   const mediaPaths = filterToolResultMediaUrls(toolName, extractToolResultMediaPaths(result));
   if (mediaPaths.length === 0) {
     return;
   }
-  try {
-    void ctx.params.onToolResult({ mediaUrls: mediaPaths });
-  } catch {
-    // ignore delivery failures
-  }
+  const payload = { mediaUrls: mediaPaths };
+  ctx.toolResultsBuffer.push(payload);
 }
 
 export async function handleToolExecutionStart(
@@ -204,6 +199,7 @@ export async function handleToolExecutionStart(
 
   const meta = extendExecMeta(toolName, args, inferToolMetaFromArgs(toolName, args));
   ctx.state.toolMetaById.set(toolCallId, buildToolCallSummary(toolName, args, meta));
+  ctx.pendingToolCallIds.add(toolCallId);
   ctx.log.debug(
     `embedded run tool start: runId=${ctx.params.runId} tool=${toolName} toolCallId=${toolCallId}`,
   );
@@ -438,6 +434,12 @@ export async function handleToolExecutionEnd(
     );
 
     emitToolResultOutput({ ctx, toolName, meta, isToolError, result, sanitizedResult });
+
+    ctx.pendingToolCallIds.delete(toolCallId);
+
+    if (ctx.pendingToolCallIds.size === 0) {
+      ctx.flushToolResultsBuffer();
+    }
 
     // Run after_tool_call plugin hook (fire-and-forget)
     const hookRunnerAfter = ctx.hookRunner ?? getGlobalHookRunner();

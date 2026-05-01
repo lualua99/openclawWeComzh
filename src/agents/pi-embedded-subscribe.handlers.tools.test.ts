@@ -46,12 +46,19 @@ function createTestContext(): {
       messagingToolSentTargets: [],
       successfulCronAdds: 0,
       consecutiveToolErrors: 0,
+      iterationDepth: 0,
+      chaosScore: 0,
+      pendingToolCallIds: new Set<string>(),
+      toolResultsBuffer: [],
     },
     shouldEmitToolResult: () => false,
     shouldEmitToolOutput: () => false,
     emitToolSummary: vi.fn(),
     emitToolOutput: vi.fn(),
     trimMessagingToolSent: vi.fn(),
+    flushToolResultsBuffer: vi.fn(),
+    pendingToolCallIds: new Set<string>(),
+    toolResultsBuffer: [],
   };
 
   return { ctx, warn, onBlockReplyFlush };
