@@ -1167,18 +1167,21 @@ Writing about tools in plain text WILL NOT execute them.
   } else {
     const lastMsg = messages[messages.length - 1];
     if (lastMsg.role === "toolResult") {
-      const tr = lastMsg as unknown as ToolResultMessage & {
-        content: string | Array<{ type: "text"; text: string }>;
-      };
-      let resultText = "";
-      if (Array.isArray(tr.content)) {
-        for (const part of tr.content) {
-          if (part.type === "text") {
-            resultText += part.text;
+      const toolResults = messages.filter((m) => m.role === "toolResult") as Array<ToolResultMessage & { content: string | Array<{ type: "text"; text: string }> }>;
+      if (toolResults.length > 0) {
+        const responses = toolResults.map((tr) => {
+          let resultText = "";
+          if (Array.isArray(tr.content)) {
+            for (const part of tr.content) {
+              if (part.type === "text") {
+                resultText += part.text;
+              }
+            }
           }
-        }
+          return `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>`;
+        }).join("\n");
+        return `${responses}\n\nPlease proceed based on these tool results.`;
       }
-      return `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>\n\nPlease proceed based on this tool result.`;
     } else {
       const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
       if (lastUserMessage) {

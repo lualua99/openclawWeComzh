@@ -168,17 +168,17 @@ export class PromptBuilder {
         resultText = tr.content;
       }
       return `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>\n\nPlease proceed based on this tool result.`;
-    } else {
-      const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
-      if (lastUserMessage) {
-        if (typeof lastUserMessage.content === "string") {
-          return lastUserMessage.content;
-        } else if (Array.isArray(lastUserMessage.content)) {
-          return lastUserMessage.content
-            .filter((part) => part.type === "text")
-            .map((part) => (part as { text: string }).text)
-            .join("");
-        }
+    }
+
+    const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
+    if (lastUserMessage) {
+      if (typeof lastUserMessage.content === "string") {
+        return lastUserMessage.content;
+      } else if (Array.isArray(lastUserMessage.content)) {
+        return lastUserMessage.content
+          .filter((part) => part.type === "text")
+          .map((part) => (part as { text: string }).text)
+          .join("");
       }
     }
     return "";

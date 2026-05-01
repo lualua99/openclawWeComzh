@@ -160,27 +160,32 @@ function buildPrompt(
   } else {
     const lastMsg = messages[messages.length - 1];
     if (lastMsg.role === "toolResult") {
-      const tr = lastMsg as ToolResultMessageWithContent;
-      let resultText = "";
-      if (Array.isArray(tr.content)) {
-        for (const part of tr.content) {
-          if (part.type === "text") {
-            resultText += part.text;
+      const toolResults = messages.filter((m) => m.role === "toolResult") as ToolResultMessageWithContent[];
+      if (toolResults.length > 0) {
+        const responses = toolResults.map((tr) => {
+          let resultText = "";
+          if (Array.isArray(tr.content)) {
+            for (const part of tr.content) {
+              if (part.type === "text") {
+                resultText += part.text;
+              }
+            }
           }
-        }
+          return `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>`;
+        }).join("\n");
+        return `${responses}\n\nPlease proceed based on these tool results.`;
       }
-      return `\n<tool_response id="${tr.toolCallId}" name="${tr.toolName}">\n${resultText}\n</tool_response>\n\nPlease proceed based on this tool result.`;
-    } else {
-      const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
-      if (lastUserMessage) {
-        if (typeof lastUserMessage.content === "string") {
-          return lastUserMessage.content;
-        } else if (Array.isArray(lastUserMessage.content)) {
-          return lastUserMessage.content
-            .filter((part) => part.type === "text")
-            .map((part) => (part as TextContent).text)
-            .join("");
-        }
+    }
+
+    const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
+    if (lastUserMessage) {
+      if (typeof lastUserMessage.content === "string") {
+        return lastUserMessage.content;
+      } else if (Array.isArray(lastUserMessage.content)) {
+        return lastUserMessage.content
+          .filter((part) => part.type === "text")
+          .map((part) => (part as TextContent).text)
+          .join("");
       }
     }
   }
