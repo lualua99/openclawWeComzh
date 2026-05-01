@@ -73,9 +73,12 @@ export function extractThinking(message: unknown): string | null {
     for (const p of content) {
       const item = p as Record<string, unknown>;
       if (item.type === "thinking" && typeof item.thinking === "string") {
-        const cleaned = item.thinking.trim();
+        let cleaned = item.thinking.trim();
         if (cleaned) {
-          parts.push(cleaned);
+          cleaned = stripThinkingTags(cleaned);
+          if (cleaned) {
+            parts.push(cleaned);
+          }
         }
       }
     }
@@ -84,7 +87,6 @@ export function extractThinking(message: unknown): string | null {
     return parts.join("\n");
   }
 
-  // Back-compat: older logs or streaming may have <think> tags inside text blocks.
   const rawText = extractRawText(message);
   if (!rawText) {
     return null;
@@ -93,12 +95,19 @@ export function extractThinking(message: unknown): string | null {
   const thinkingRegex =
     /(?:<\s*(?:think(?:ing)?|thought|antthinking)\b[^<>]*>|\[\[reply_to_current\]\]|\n?think\s*>|\[\(\s*(?:deep_)?think\s*\)\])([\s\S]*?)(?:<\s*\/\s*(?:think(?:ing)?|thought|antthinking)\b[^<>]*>|\[\[reply_to_current\]\]|\[\(\s*\/\s*(?:deep_)?think\s*\)\]|$)/gi;
   const matches = [...rawText.matchAll(thinkingRegex)];
-  const extracted = matches.map((m) => (m[1] ?? "").trim()).filter(Boolean);
+  const extracted = matches.map((m) => {
+    const content = (m[1] ?? "").trim();
+    return content ? stripThinkingTags(content) : "";
+  }).filter(Boolean);
 
   if (extracted.length === 0 && rawText.includes("[[reply_to_current]]")) {
     const [thought] = rawText.split(/\[\[reply_to_current\]\]/i);
-    if (thought.trim()) {
-      extracted.push(thought.trim());
+    const cleaned = thought.trim();
+    if (cleaned) {
+      const stripped = stripThinkingTags(cleaned);
+      if (stripped) {
+        extracted.push(stripped);
+      }
     }
   }
 

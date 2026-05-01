@@ -332,7 +332,9 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   }
 
   if (props.stream !== null) {
-    const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
+    const streamLength = (props.stream?.length ?? 0) + (props.streamThinking?.length ?? 0);
+    const hasContent = (props.stream?.trim().length ?? 0) > 0 || (props.streamThinking?.trim().length ?? 0) > 0;
+    const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}:${hasContent ? streamLength : "loading"}`;
     items.push({
       kind: "stream",
       key,
@@ -340,13 +342,11 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
       thinking: props.streamThinking ?? undefined,
       startedAt: props.streamStartedAt ?? Date.now(),
     });
-  }
-
-  if (props.sending && !props.stream) {
-    const key = `reading:${props.sessionKey}:${props.streamStartedAt ?? Date.now()}`;
+  } else if (props.sending) {
+    const readingKey = `reading:${props.sessionKey}:${props.streamStartedAt ?? "start"}`;
     items.push({
       kind: "reading-indicator",
-      key,
+      key: readingKey,
     });
   }
 

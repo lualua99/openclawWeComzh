@@ -280,15 +280,32 @@ export class ScrollRestoration {
     if (this.hasRestored) {
       return;
     }
-    // Ignore the passed container, use page scrolling element directly
-    const targetContainer = document.scrollingElement || document.body || document.documentElement;
+    // Use the actual chat container (.chat-thread) instead of page scrolling element
+    const chatContainer = this.hostElement?.querySelector(".chat-thread") as HTMLElement | null;
+    if (!chatContainer) {
+      console.log("[ScrollRestoration] Chat container not found, using passed container");
+    }
+    const targetContainer = chatContainer || container;
 
-    setTimeout(() => {
-      if (targetContainer) {
+    let attempts = 0;
+    const maxAttempts = 10;
+    const attemptScroll = () => {
+      attempts++;
+      if (targetContainer.scrollHeight > targetContainer.clientHeight) {
         targetContainer.scrollTop = targetContainer.scrollHeight;
-        console.log("[ScrollRestoration] Force scroll to bottom:", targetContainer.scrollHeight);
+        console.log(`[ScrollRestoration] Force scroll to bottom (attempt ${attempts}):`, targetContainer.scrollHeight);
+        this.hasRestored = true;
+      } else if (attempts < maxAttempts) {
+        setTimeout(attemptScroll, 100);
+      } else {
+        targetContainer.scrollTop = targetContainer.scrollHeight;
+        console.log("[ScrollRestoration] Final attempt scroll to bottom");
+        this.hasRestored = true;
       }
-    }, 200);
+    };
+
+    // Start scrolling after a short delay to let DOM settle
+    setTimeout(attemptScroll, 50);
 
     // Clear saved position to avoid interference
     sessionStorage.removeItem("chat-scroll-position");

@@ -420,11 +420,17 @@ export async function handleToolExecutionEnd(
 
     if (isToolError) {
       const errorMsg = extractToolErrorMessage(sanitizedResult) || "Unknown error";
-      console.log(`\x1b[31m❌ ${toolName}: ${errorMsg.slice(0, 100)}${errorMsg.length > 100 ? "..." : ""}\x1b[0m`);
+      const errorPreview = errorMsg.split("\n").slice(0, 2).join("\n");
+      console.log(`❌ ${toolName}: ${errorPreview}`);
     } else {
       const resultText = extractToolResultText(sanitizedResult);
-      const resultPreview = resultText ? resultText.slice(0, 100) : "(no output)";
-      console.log(`\x1b[32m✓ ${toolName}: ${resultPreview}${resultText && resultText.length > 100 ? "..." : ""}\x1b[0m`);
+      if (resultText) {
+        const lines = resultText.split("\n").slice(0, 2);
+        const preview = lines.join(" ");
+        console.log(`✓ ${toolName}: ${preview}`);
+      } else {
+        console.log(`✓ ${toolName}: (done)`);
+      }
     }
 
     ctx.log.debug(

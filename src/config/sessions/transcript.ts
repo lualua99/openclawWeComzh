@@ -154,6 +154,6 @@ export async function appendAssistantMessageToSessionTranscript(params: {
   });
 
   emitSessionTranscriptUpdate(sessionFile);
-  console.log(`💾 保存 | ${path.basename(sessionFile)}`);
+  console.log(`💾 ${path.basename(sessionFile)}`);
   return { ok: true, sessionFile };
 }

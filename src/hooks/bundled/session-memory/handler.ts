@@ -309,9 +309,8 @@ const saveSessionToMemory: HookHandler = async (event) => {
     await fs.writeFile(memoryFilePath, entry, "utf-8");
     log.debug("Memory file written successfully");
 
-    // Log completion (but don't send user-visible confirmation - it's internal housekeeping)
     const relPath = memoryFilePath.replace(os.homedir(), "~");
-    log.info(`💾 会话上下文已保存至 ${relPath}`);
+    console.log(`💾 ${path.basename(memoryFilePath)}`);
   } catch (err) {
     if (err instanceof Error) {
       log.error("Failed to save session memory", {

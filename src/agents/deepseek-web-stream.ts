@@ -19,6 +19,13 @@ function getShortSessionId(sessionKey: string): string {
   return sessionKey.slice(0, 4) + ".." + sessionKey.slice(-4);
 }
 
+function formatNumber(num: number): string {
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + "K";
+  }
+  return num.toString();
+}
+
 interface DeepseekStreamOptions {
   searchEnabled?: boolean;
   preempt?: boolean;
@@ -335,9 +342,27 @@ export function createDeepseekWebStreamFn(
         };
 
         const inputTokenCount = estimateTokens(prompt);
+        let currentStatus = "发送中";
         console.log(
-          `🚀 启动 | ${getShortSessionId(sessionKey)} | prompt: ${inputTokenCount}`,
+          `⚡ ${getShortSessionId(sessionKey)} → ${formatNumber(inputTokenCount)}`,
         );
+
+        const updateStatus = (status: string) => {
+          currentStatus = status;
+          const icon = status === "思考" ? "⏳" : status === "思考完成" ? "💭" : "📤";
+          console.log(
+            `${icon} ${status}`,
+          );
+        };
+
+        const endSession = () => {
+          const outputTokens = Math.ceil(outputTokenCount / 4);
+          const totalTokens = inputTokenCount + outputTokens;
+          const stopReason = finalContent.some((p) => p.type === "toolCall") ? "🔧 tool_use" : "✓ stop";
+          console.log(
+            `✓ ${formatNumber(inputTokenCount)}→${formatNumber(outputTokens)} ${stopReason}`,
+          );
+        };
 
         const responseStream = await client.chatCompletions({
           sessionId: dsSessionId,
@@ -384,6 +409,7 @@ export function createDeepseekWebStreamFn(
         };
 
         let outputTokenCount = 0;
+        let hasTextStarted = false;
 
         // Buffer for streamed text output
         let textBuffer = "";
@@ -405,6 +431,10 @@ export function createDeepseekWebStreamFn(
             indexMap.set(key, index);
             contentParts[index] = { type: "text", text: "" };
             stream.push({ type: "text_start", contentIndex: index, partial: createPartial() });
+            if (!hasTextStarted) {
+              hasTextStarted = true;
+              updateStatus("输出");
+            }
           }
           (contentParts[index] as TextContent).text += flushedText;
           accumulatedContentParts.push(flushedText);
@@ -663,8 +693,10 @@ export function createDeepseekWebStreamFn(
 
               if (first.type === "think_start") {
                 currentMode = "thinking";
+                updateStatus("思考");
               } else if (first.type === "think_end") {
                 currentMode = "text";
+                updateStatus("思考完成");
               } else if (first.type === "final_start") {
                 currentMode = "text";
               } else if (first.type === "final_end") {
@@ -700,7 +732,8 @@ export function createDeepseekWebStreamFn(
                       part.arguments = { raw: argStr };
                     }
                     const argsStr = JSON.stringify(part.arguments);
-                    console.log(`\x1b[33m🔧 ${part.name}: ${argsStr.length > 250 ? argsStr.slice(0, 250) + "..." : argsStr}\x1b[0m`);
+                    const argsPreview = argsStr.length > 100 ? argsStr.slice(0, 100) + "..." : argsStr;
+                    console.log(`🔧 ${part.name}: ${argsPreview}`);
                     stream.push({
                       type: "toolcall_end",
                       contentIndex: index,
@@ -894,18 +927,17 @@ export function createDeepseekWebStreamFn(
         });
 
         const outputTokens = Math.ceil(outputTokenCount / 4);
-        const totalTokens = inputTokenCount + outputTokens;
-        const stopReason = finalContent.some((p) => p.type === "toolCall") ? "toolUse" : "stop";
+        const stopReason = finalContent.some((p) => p.type === "toolCall") ? "🔧 tool" : "✓ stop";
 
         const toolCallParts = finalContent.filter((p) => p.type === "toolCall");
         let toolInfo = "";
         if (toolCallParts.length > 0) {
-          const toolSummary = toolCallParts.map(p => `${p.name}:${p.id}`).join(", ");
-          toolInfo = ` | 工具: ${toolSummary}`;
+          const toolSummary = toolCallParts.map(p => p.name).join(", ");
+          toolInfo = ` → ${toolSummary}`;
         }
 
         console.log(
-          `✅ 结束 | in: ${inputTokenCount} | out: ${outputTokens} | total: ${totalTokens} | ${stopReason}${toolInfo}`,
+          `✓ ${formatNumber(inputTokenCount)}→${formatNumber(outputTokens)} ${stopReason}${toolInfo}`,
         );
 
         const assistantMessage: AssistantMessage = {
