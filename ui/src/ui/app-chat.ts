@@ -23,6 +23,7 @@ export type ChatHost = {
   chatAvatarUrl: string | null;
   chatWebSearchEnabled: boolean;
   refreshSessionsAfterChat: Set<string>;
+  sandboxTaskPlanSuppressed?: boolean;
 };
 
 export const CHAT_SESSIONS_ACTIVE_MINUTES = 120;
@@ -105,12 +106,8 @@ async function sendChatMessageNow(
   },
 ) {
   resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
-  // Lift the task-plan suppression flag for real user messages (not /new responses)
-  if (!opts?.refreshSessions) {
-    const s = host as unknown as Record<string, unknown>;
-    if (s.sandboxTaskPlanSuppressed) {
-      s.sandboxTaskPlanSuppressed = false;
-    }
+  if (!opts?.refreshSessions && host.sandboxTaskPlanSuppressed) {
+    host.sandboxTaskPlanSuppressed = false;
   }
   const runId = await sendChatMessage(host as unknown as OpenClawApp, message, opts?.attachments, {
     webSearchEnabled: host.chatWebSearchEnabled,
@@ -192,11 +189,11 @@ export async function handleSendChat(
 
   const refreshSessions = isChatResetCommand(message);
   if (refreshSessions) {
+    host.sandboxTaskPlanSuppressed = true;
     const s = host as unknown as import("./app-view-state.ts").AppViewState;
     s.sandboxTaskPlan = null;
     s.sandboxTaskPlanLoading = false;
     s.sandboxTaskPlanError = null;
-    (s as unknown as { sandboxTaskPlanSuppressed: boolean }).sandboxTaskPlanSuppressed = true;
     s.sandboxChatEvents = {};
     s.chatMessages = [];
     s.chatToolMessages = [];

@@ -180,7 +180,6 @@ export class ScrollRestoration {
     this.hostElement = hostElement;
     if (typeof history !== "undefined") {
       history.scrollRestoration = "manual";
-      console.log("[ScrollRestoration] Disabled browser native scroll restoration");
     }
     this.setupMutationObserver();
   }
@@ -191,14 +190,12 @@ export class ScrollRestoration {
     }
     const messagesContainer = this.hostElement.querySelector(".chat-messages, .chat-thread");
     if (!messagesContainer) {
-      console.log("[ScrollRestoration] No messages container found for MutationObserver");
       return;
     }
     this.mutationObserver = new MutationObserver(() => {
       if (!this.hasRestored) {
         return;
       }
-      console.log("[ScrollRestoration] MutationObserver detected content change, re-attempting restore");
       const container = this.hostElement?.querySelector(".chat-thread") as HTMLElement | null;
       if (container) {
         this.restoreWithRetry(container);
@@ -208,7 +205,6 @@ export class ScrollRestoration {
       childList: true,
       subtree: true,
     });
-    console.log("[ScrollRestoration] MutationObserver established");
   }
 
   destroy(): void {
@@ -235,7 +231,6 @@ export class ScrollRestoration {
   attachScrollListener(container: HTMLElement): void {
     this.container = container;
     container.addEventListener("scroll", this.scrollHandler);
-    console.log("[ScrollRestoration] Scroll listener attached");
   }
 
   save(container: HTMLElement): void {
@@ -252,7 +247,6 @@ export class ScrollRestoration {
           timestamp: Date.now(),
         };
         sessionStorage.setItem(SCROLL_POSITION_KEY, JSON.stringify(data));
-        console.log(`[ScrollRestoration] Saved scroll position: scrollTop=${scrollTop}, scrollHeight=${scrollHeight}`);
         this.saveTimeout = null;
       }, SCROLL_THROTTLE_MS);
     }
@@ -272,7 +266,6 @@ export class ScrollRestoration {
         timestamp: Date.now(),
       };
       sessionStorage.setItem(SCROLL_POSITION_KEY, JSON.stringify(data));
-      console.log(`[ScrollRestoration] Saved scroll position immediately: scrollTop=${scrollTop}, scrollHeight=${scrollHeight}`);
     }
   }
 
@@ -280,11 +273,7 @@ export class ScrollRestoration {
     if (this.hasRestored) {
       return;
     }
-    // Use the actual chat container (.chat-thread) instead of page scrolling element
     const chatContainer = this.hostElement?.querySelector(".chat-thread") as HTMLElement | null;
-    if (!chatContainer) {
-      console.log("[ScrollRestoration] Chat container not found, using passed container");
-    }
     const targetContainer = chatContainer || container;
 
     let attempts = 0;
@@ -293,21 +282,17 @@ export class ScrollRestoration {
       attempts++;
       if (targetContainer.scrollHeight > targetContainer.clientHeight) {
         targetContainer.scrollTop = targetContainer.scrollHeight;
-        console.log(`[ScrollRestoration] Force scroll to bottom (attempt ${attempts}):`, targetContainer.scrollHeight);
         this.hasRestored = true;
       } else if (attempts < maxAttempts) {
         setTimeout(attemptScroll, 100);
       } else {
         targetContainer.scrollTop = targetContainer.scrollHeight;
-        console.log("[ScrollRestoration] Final attempt scroll to bottom");
         this.hasRestored = true;
       }
     };
 
-    // Start scrolling after a short delay to let DOM settle
     setTimeout(attemptScroll, 50);
 
-    // Clear saved position to avoid interference
     sessionStorage.removeItem("chat-scroll-position");
   }
 
@@ -315,8 +300,6 @@ export class ScrollRestoration {
     let attempts = 0;
     const maxAttempts = MAX_RETRY_ATTEMPTS;
 
-    // 如果没有传入目标位置，才从 sessionStorage 读取
-    // 注意：刷新时 restore 方法已经传入了 container.scrollHeight，所以不会走这个分支
     if (targetScrollTop === undefined) {
       const saved = sessionStorage.getItem(SCROLL_POSITION_KEY);
       if (!saved) {
@@ -325,26 +308,20 @@ export class ScrollRestoration {
       try {
         const data: ScrollPositionData = JSON.parse(saved);
         targetScrollTop = data.scrollTop;
-        console.log(`[ScrollRestoration] No target provided, using saved position: ${targetScrollTop}`);
-      } catch (e) {
-        console.error("[ScrollRestoration] Failed to parse saved scroll position:", e);
+      } catch {
         return;
       }
-    } else {
-      console.log(`[ScrollRestoration] Using provided target: ${targetScrollTop}`);
     }
 
     const tryRestore = () => {
       attempts++;
       container.scrollTop = targetScrollTop as number;
       const actualScrollTop = container.scrollTop;
-      console.log(`[ScrollRestoration] Restore attempt ${attempts}/${maxAttempts}: scrollTop=${actualScrollTop}, target=${targetScrollTop}`);
 
       if (Math.abs(actualScrollTop - (targetScrollTop as number)) > 10 && attempts < maxAttempts) {
         requestAnimationFrame(tryRestore);
       } else {
         this.hasRestored = true;
-        console.log(`[ScrollRestoration] Restore completed: scrollTop=${actualScrollTop}`);
       }
     };
 
@@ -360,12 +337,11 @@ export class ScrollRestoration {
       try {
         const data: ScrollPositionData = JSON.parse(saved);
         const targetScrollTop = data.scrollTop;
-        console.log(`[ScrollRestoration] Attempting to restore after render: ${targetScrollTop}`);
         setTimeout(() => {
           this.restoreWithRetry(container, targetScrollTop);
         }, RESTORE_DELAY_MS);
-      } catch (e) {
-        console.error("[ScrollRestoration] Failed to parse saved scroll position:", e);
+      } catch {
+        return;
       }
     }
   }
@@ -386,8 +362,6 @@ export class ScrollRestoration {
           this.restore(found);
         } else if (attempts < maxAttempts) {
           setTimeout(tryFindContainer, RETRY_INTERVAL_MS);
-        } else {
-          console.log("[ScrollRestoration] Container not found after max attempts");
         }
       };
       setTimeout(tryFindContainer, RETRY_INTERVAL_MS);
@@ -397,12 +371,10 @@ export class ScrollRestoration {
   reset(): void {
     this.hasRestored = false;
     sessionStorage.removeItem(SCROLL_POSITION_KEY);
-    console.log("[ScrollRestoration] Scroll restoration state reset");
   }
 
   clear(): void {
     sessionStorage.removeItem(SCROLL_POSITION_KEY);
-    console.log("[ScrollRestoration] Scroll position cleared");
   }
 }
 

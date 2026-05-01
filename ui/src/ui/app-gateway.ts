@@ -263,6 +263,8 @@ function handleChatGatewayEvent(host: GatewayHost, payload: ChatEventPayload | u
   }
 }
 
+let agentPlanRefreshLast = 0;
+
 function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   host.eventLogBuffer = [
     { ts: Date.now(), event: evt.event, payload: evt.payload },
@@ -280,6 +282,11 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       host as unknown as Parameters<typeof handleAgentEvent>[0],
       evt.payload as AgentEventPayload | undefined,
     );
+    const now = Date.now();
+    if (!agentPlanRefreshLast || now - agentPlanRefreshLast > 3000) {
+      agentPlanRefreshLast = now;
+      void loadSandboxTaskPlan(host as unknown as OpenClawApp);
+    }
     return;
   }
 
@@ -338,18 +345,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     const payload = evt.payload as GatewayUpdateAvailableEventPayload | undefined;
     host.updateAvailable = payload?.updateAvailable ?? null;
   }
-
-  // Auto-refresh task plan when agent tool calls stream in (debounced to avoid flooding)
-  if (evt.event === "agent") {
-    const now = Date.now();
-    if (!agentPlanRefreshLast || now - agentPlanRefreshLast > 3000) {
-      agentPlanRefreshLast = now;
-      void loadSandboxTaskPlan(host as unknown as OpenClawApp);
-    }
-  }
 }
-
-let agentPlanRefreshLast = 0;
 
 export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
   const snapshot = hello.snapshot as

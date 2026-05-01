@@ -662,14 +662,10 @@ export class OpenClawApp extends LitElement {
 
   handleCloseSidebar() {
     this.sidebarOpen = false;
-    // Clear content after transition
     if (this.sidebarCloseTimer != null) {
       window.clearTimeout(this.sidebarCloseTimer);
     }
     this.sidebarCloseTimer = window.setTimeout(() => {
-      if (this.sidebarOpen) {
-        return;
-      }
       this.sidebarContent = null;
       this.sidebarError = null;
       this.sidebarCloseTimer = null;

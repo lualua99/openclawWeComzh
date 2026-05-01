@@ -247,10 +247,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   if (payload.state === "delta") {
     const next = extractText(payload.message);
     if (typeof next === "string") {
-      const current = state.chatStream ?? "";
-      if (!current || next.length >= current.length) {
-        state.chatStream = next;
-      }
+      state.chatStream = next;
     }
     // Also extract thinking deltas specifically
     const m = payload.message as Record<string, unknown>;
