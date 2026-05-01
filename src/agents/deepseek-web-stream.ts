@@ -741,8 +741,7 @@ export function createDeepseekWebStreamFn(
                       part.arguments = { raw: argStr };
                     }
                     const argsStr = JSON.stringify(part.arguments);
-                    const argsPreview = argsStr.length > 500 ? argsStr.slice(0, 500) + "..." : argsStr;
-                    console.log(`🔧 ${part.name}: ${argsPreview}`);
+                    console.log(`\x1b[34m🔧 ${part.name}\x1b[0m: ${argsStr}`);
                     stream.push({
                       type: "toolcall_end",
                       contentIndex: index,

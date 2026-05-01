@@ -416,16 +416,13 @@ export async function handleToolExecutionEnd(
 
     if (isToolError) {
       const errorMsg = extractToolErrorMessage(sanitizedResult) || "Unknown error";
-      const errorPreview = errorMsg.split("\n").slice(0, 5).join("\n");
-      console.log(`❌ ${toolName}: ${errorPreview}`);
+      console.log(`\x1b[34m❌ ${toolName}\x1b[0m: ${errorMsg}`);
     } else {
       const resultText = extractToolResultText(sanitizedResult);
       if (resultText) {
-        const lines = resultText.split("\n").slice(0, 5);
-        const preview = lines.join("\n");
-        console.log(`✓ ${toolName}: ${preview}`);
+        console.log(`\x1b[34m✓ ${toolName}\x1b[0m: ${resultText}`);
       } else {
-        console.log(`✓ ${toolName}: (done)`);
+        console.log(`\x1b[34m✓ ${toolName}\x1b[0m: (done)`);
       }
     }
 
