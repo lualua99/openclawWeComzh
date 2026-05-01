@@ -130,7 +130,7 @@
   align-items: flex-end;
   padding: 0 24px 10px;
   border-bottom: 1px solid transparent;
-  background: linear-gradient(180deg, rgba(22, 119, 255, 0.08) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
 }
 
 .brand {
@@ -143,12 +143,12 @@
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 8px rgba(22, 119, 255, 0.4));
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.4));
   transition: filter var(--duration-normal) var(--ease-out);
 }
 
 .brand-logo:hover {
-  filter: drop-shadow(0 0 12px rgba(22, 119, 255, 0.6));
+  filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.6));
 }
 
 .brand-logo img {

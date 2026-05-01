@@ -66,7 +66,7 @@
 }
 
 .chat-group.user .chat-sender-name {
-  color: #1677ff;
+  color: #3b82f6;
 }
 
 .chat-group.assistant .chat-sender-name {
@@ -74,7 +74,7 @@
 }
 
 :root[data-theme="dark"] .chat-group.user .chat-sender-name {
-  color: #1677ff;
+  color: #3b82f6;
 }
 
 :root[data-theme="dark"] .chat-group.assistant .chat-sender-name {
@@ -140,12 +140,12 @@
 }
 
 .chat-avatar.user {
-  background: #1677ff;
+  background: #3b82f6;
   color: #fff;
 }
 
 :root[data-theme="dark"] .chat-avatar.user {
-  background: #1677ff;
+  background: #3b82f6;
   color: #fff;
 }
 
@@ -189,13 +189,13 @@ img.chat-avatar {
   display: inline-block;
   background: #f5f7fa;
   border: 1px solid #e8ecf0;
-  border-radius: 4px 18px 18px 18px;
+  border-radius: 20px;
   padding: 10px 14px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   max-width: 100%;
   word-wrap: break-word;
   color: #1f1f1f;
-  transition: background 120ms ease-out, transform 200ms ease-out, box-shadow 200ms ease-out;
+  transition: background 150ms var(--ease-out), transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
 }
 
 /* Dark mode assistant bubble */
@@ -208,16 +208,16 @@ img.chat-avatar {
 
 /* User bubbles - clean solid style */
 .chat-group.user .chat-bubble {
-  background: #1677ff !important;
+  background: #3b82f6 !important;
   border-color: transparent !important;
-  border-radius: 18px 4px 18px 18px;
+  border-radius: 20px;
   color: #fff !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   opacity: 1 !important;
 }
 
 :root[data-theme="dark"] .chat-group.user .chat-bubble {
-  background: #1677ff !important;
+  background: #3b82f6 !important;
   border-color: transparent !important;
   color: #fff !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -258,15 +258,15 @@ img.chat-avatar {
 }
 
 .chat-group.user .chat-bubble:hover {
-  background: #1677ff !important;
-  box-shadow: 0 1px 6px rgba(22, 119, 255, 0.35), 0 6px 20px rgba(22, 119, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: scale(1.01);
+  background: #3b82f6 !important;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35), 0 8px 24px rgba(59, 130, 246, 0.2), 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: scale(1.01) translateY(-2px);
 }
 
 :root[data-theme="dark"] .chat-group.user .chat-bubble:hover {
-  background: #1677ff !important;
-  box-shadow: 0 1px 6px rgba(22, 119, 255, 0.35), 0 6px 20px rgba(22, 119, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3);
-  transform: scale(1.01);
+  background: #3b82f6 !important;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35), 0 8px 24px rgba(59, 130, 246, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3);
+  transform: scale(1.01) translateY(-2px);
 }
 
 /* Copy button */
@@ -383,11 +383,11 @@ img.chat-avatar {
 @keyframes streaming-pulse {
   0%, 100% {
     border-color: #3b82f6;
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
   }
   50% {
-    border-color: #1e40af;
-    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.3);
+    border-color: #2563eb;
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.25);
   }
 }
 

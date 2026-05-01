@@ -21,14 +21,15 @@
 .config-sidebar {
   display: flex;
   flex-direction: column;
-  background: var(--bg-accent);
+  background: rgba(20, 20, 20, 0.8);
+  backdrop-filter: blur(12px);
   border-right: 1px solid var(--border);
   min-height: 0;
   overflow: hidden;
 }
 
 :root[data-theme="light"] .config-sidebar {
-  background: var(--bg-hover);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .config-sidebar__header {
@@ -675,11 +676,16 @@
   border-radius: var(--radius-lg);
   background: var(--bg-elevated);
   overflow: hidden;
-  transition: border-color var(--duration-fast) ease;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .config-section-card:hover {
   border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 :root[data-theme="light"] .config-section-card {
