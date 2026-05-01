@@ -12,6 +12,15 @@ import type { AgentStreamParams } from "../commands/agent/types.js";
 import { QwenWebClient, type QwenWebClientOptions } from "../providers/qwen-web-client.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
 
+type AssistantMessageWithThinking = AssistantMessage & {
+  thinking_enabled?: boolean;
+};
+
+function setThinkingEnabled(msg: AssistantMessage, enabled: boolean): AssistantMessage {
+  (msg as AssistantMessageWithThinking).thinking_enabled = enabled;
+  return msg;
+}
+
 const sessionMap = new Map<string, string>();
 const parentMessageMap = new Map<string, string>();
 const lastSearchStateMap = new Map<string, boolean>();
@@ -338,9 +347,7 @@ export function createQwenWebStreamFn(
             stopReason: accumulatedToolCalls.length > 0 ? "toolUse" : "stop",
             timestamp: Date.now(),
           };
-          (msg as AssistantMessage & { thinking_enabled?: boolean }).thinking_enabled =
-            contentParts.some((p) => p.type === "thinking");
-          return msg;
+          return setThinkingEnabled(msg, contentParts.some((p) => p.type === "thinking"));
         };
 
         let currentMode: "text" | "thinking" | "tool_call" = "text";

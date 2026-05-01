@@ -16,8 +16,32 @@ import { emitAgentEvent } from "../infra/agent-events.js";
 import { SessionManager, getGlobalSessionManager } from "./session-manager.js";
 import { PromptBuilder } from "./prompt-builder.js";
 import { DeepSeekStreamAdapter } from "./deepseek-stream-adapter.js";
+import {
+  REGEX_THINK_START,
+  REGEX_THINK_END,
+  REGEX_FINAL_START,
+  REGEX_FINAL_END,
+  REGEX_TOOL_CALL_START,
+  REGEX_TOOL_CALL_END,
+  REGEX_REPLY,
+  REGEX_MALFORMED_THINK,
+  INTERNAL_TOOLS,
+  STREAM_ADAPTER_V2,
+  SESSION_TTL_MS,
+  MAX_SESSIONS,
+  CLEANUP_INTERVAL_MS,
+} from "./types.js";
 
-const FEATURE_FLAG = process.env.OPENCLAW_STREAM_ADAPTER_V2 === "true";
+type AssistantMessageWithThinking = AssistantMessage & {
+  thinking_enabled?: boolean;
+};
+
+function setThinkingEnabled(msg: AssistantMessage, enabled: boolean): AssistantMessage {
+  (msg as AssistantMessageWithThinking).thinking_enabled = enabled;
+  return msg;
+}
+
+const FEATURE_FLAG = STREAM_ADAPTER_V2;
 
 interface DeepseekStreamOptions {
   searchEnabled?: boolean;
@@ -53,13 +77,6 @@ interface DeepSeekStreamContext {
 const sessionMap = new Map<string, string>();
 const parentMessageMap = new Map<string, string | number>();
 const sessionTimestampMap = new Map<string, number>();
-
-const SESSION_TTL_MS = 30 * 60 * 1000;
-const MAX_SESSIONS = 100;
-const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-
-const JUNK_TOKENS = new Set(["<｜end▁of▁thinking｜>", "<|endoftext|>"]);
-const INTERNAL_TOOLS = new Set(["web_search"]);
 
 let lastCleanup = Date.now();
 
@@ -231,9 +248,7 @@ function createStreamFnV1(
             stopReason: accumulatedToolCalls.length > 0 ? "toolUse" : "stop",
             timestamp: Date.now(),
           };
-          (msg as unknown as { thinking_enabled: boolean }).thinking_enabled =
-            !!getAccumulatedReasoning();
-          return msg;
+          return setThinkingEnabled(msg, !!getAccumulatedReasoning());
         };
 
         let currentMode: "text" | "thinking" | "tool_call" = "text";
@@ -241,15 +256,6 @@ function createStreamFnV1(
         let currentToolIndex = 0;
         let tagBuffer = "";
         let skippingInternalTool = false;
-
-        const REGEX_THINK_START = /<(?:think(?:ing)?|thought)\b[^<>]*>/i;
-        const REGEX_THINK_END = /<\/(?:think(?:ing)?|thought)\b[^<>]*>/i;
-        const REGEX_FINAL_START = /<final\b[^<>]*>/i;
-        const REGEX_FINAL_END = /<\/final\b[^<>]*>/i;
-        const REGEX_TOOL_CALL_START = /<(?:tool_call|tool_response)(?:\s+[^>]*)?>/i;
-        const REGEX_TOOL_CALL_END = /<\/(?:tool_call|tool_response)\b[^<>]*>/i;
-        const REGEX_REPLY = /\[\[reply_to_current\]\]/i;
-        const REGEX_MALFORMED_THINK = /\n?think\s*>/i;
 
         const extractToolCallAttrs = (tag: string): { id: string | null; name: string } => {
           const isToolResponse = tag.toLowerCase().includes("tool_response");
@@ -478,7 +484,7 @@ function createStreamFnV1(
                 } else {
                   const key = `tool_${currentToolIndex}`;
                   const index = indexMap.get(key);
-                  if (index !== undefined) {
+                  if (index !== undefined && currentToolIndex < accumulatedToolCalls.length) {
                     const part = contentParts[index] as ToolCall;
                     const argData = accumulatedToolCalls[currentToolIndex].arguments;
                     const argStr = typeof argData === "string" ? argData : JSON.stringify(argData);
@@ -607,8 +613,8 @@ function createStreamFnV1(
                   pushDelta(choice.delta.content);
                 }
               }
-            } catch {
-              // Silent fail for parse errors
+            } catch (e) {
+              console.warn(`[DeepSeek] JSON parse error: ${e instanceof Error ? e.message : String(e)}`);
             }
           }
         };
@@ -631,6 +637,7 @@ function createStreamFnV1(
               }
               tagBuffer = "";
             }
+            skippingInternalTool = false;
             break;
           }
 
@@ -662,7 +669,7 @@ function createStreamFnV1(
         const assistantMessage: AssistantMessage = {
           role: "assistant",
           content: finalContent,
-          stopReason: finalContent.some((p) => p.type === "toolCall") ? "toolUse" : "stop",
+          stopReason: accumulatedToolCalls.length > 0 ? "toolUse" : "stop",
           api: model.api,
           provider: model.provider,
           model: model.id,
@@ -676,8 +683,7 @@ function createStreamFnV1(
           },
           timestamp: Date.now(),
         };
-        (assistantMessage as unknown as { thinking_enabled: boolean }).thinking_enabled =
-          !!getAccumulatedReasoning();
+        setThinkingEnabled(assistantMessage, !!getAccumulatedReasoning());
 
         stream.push({
           type: "done",
@@ -731,6 +737,8 @@ function createStreamFnV2(
     const run = async () => {
       try {
         await client.init();
+
+        sessionManager.prune();
 
         const streamContext = context as unknown as DeepSeekStreamContext;
         const sessionKey = streamContext.sessionId || "default";
@@ -970,7 +978,7 @@ function createStreamFnV2(
               const assistantMessage: AssistantMessage = {
                 role: "assistant",
                 content: finalContent,
-                stopReason: finalContent.some((p) => p.type === "toolCall") ? "toolUse" : "stop",
+                stopReason: (data.toolCalls && data.toolCalls.length > 0) ? "toolUse" : "stop",
                 api: model.api,
                 provider: model.provider,
                 model: model.id,
@@ -984,8 +992,7 @@ function createStreamFnV2(
                 },
                 timestamp: Date.now(),
               };
-              (assistantMessage as unknown as { thinking_enabled: boolean }).thinking_enabled =
-                !!data.reasoning;
+              setThinkingEnabled(assistantMessage, !!data.reasoning);
 
               stream.push({
                 type: "done",

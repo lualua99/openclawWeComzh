@@ -54,6 +54,9 @@ export class DeepSeekStreamAdapter {
   private eventQueue: DeepSeekEvent[] = [];
   private resolveNext: ((event: DeepSeekEvent | null) => void) | null = null;
 
+  private static readonly MAX_QUEUE_SIZE = 1000;
+  private static readonly QUEUE_WARN_THRESHOLD = 500;
+
   constructor(
     stream: ReadableStream<Uint8Array>,
     options: StreamAdapterOptions = {},
@@ -420,6 +423,13 @@ export class DeepSeekStreamAdapter {
   }
 
   private emitEvent(event: DeepSeekEvent): void {
+    if (this.eventQueue.length >= DeepSeekStreamAdapter.MAX_QUEUE_SIZE) {
+      console.warn(`[DeepSeekStreamAdapter] Event queue overflow (${this.eventQueue.length}), dropping oldest events`);
+      this.eventQueue.shift();
+    } else if (this.eventQueue.length >= DeepSeekStreamAdapter.QUEUE_WARN_THRESHOLD) {
+      console.warn(`[DeepSeekStreamAdapter] Event queue growing large (${this.eventQueue.length}/${DeepSeekStreamAdapter.MAX_QUEUE_SIZE})`);
+    }
+
     if (this.resolveNext) {
       this.resolveNext(event);
       this.resolveNext = null;
@@ -437,9 +447,9 @@ export class DeepSeekStreamAdapter {
       if (this.currentMode === "thinking") {
         this.emitThinkingDelta(this.tagBuffer);
       } else if (this.currentMode === "tool_call") {
-        const currentToolCall = this.accumulatedToolCalls[this.currentToolIndex];
-        if (currentToolCall) {
-          currentToolCall.raw += this.tagBuffer;
+        const toolCall = this.accumulatedToolCalls[this.currentToolIndex];
+        if (toolCall) {
+          toolCall.raw += this.tagBuffer;
         }
       } else {
         this.emitByMode(this.tagBuffer);
@@ -473,8 +483,13 @@ export class DeepSeekStreamAdapter {
   }
 
   abort(): void {
-    this.reader.cancel();
+    this.reader.cancel().catch(() => {});
     this.done = true;
     this.error = new Error("Aborted");
+
+    if (this.resolveNext) {
+      this.resolveNext(null);
+      this.resolveNext = null;
+    }
   }
 }

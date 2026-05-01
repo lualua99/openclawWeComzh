@@ -185,7 +185,9 @@ export class DeepSeekWebClient {
             break;
           }
         }
-        const targetDifficulty = difficulty > 1000 ? Math.floor(Math.log2(difficulty)) : difficulty;
+        const targetDifficulty = difficulty > 1000
+          ? Math.ceil(Math.log2(difficulty))
+          : Math.floor(difficulty);
         if (zeroBits >= targetDifficulty) {
           return nonce;
         }

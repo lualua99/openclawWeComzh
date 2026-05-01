@@ -55,14 +55,19 @@ export async function loginDeepseekWeb(params: {
         let capturedBearer: string | undefined;
         let resolved = false;
 
+        const cleanup = () => {
+          resolved = true;
+        };
+
         const timeout = setTimeout(() => {
           if (!resolved) {
+            cleanup();
             reject(new Error("Login timed out (5 minutes)."));
           }
         }, 300000);
 
         const tryResolve = async () => {
-          if (!capturedBearer || resolved) {
+          if (resolved) {
             return;
           }
 
@@ -89,14 +94,14 @@ export async function loginDeepseekWeb(params: {
               cookieString.includes("HWSID=") || cookieString.includes("uuid=");
 
             if (hasDeviceId || hasSessionId || hasSessionInfo || cookies.length > 3) {
-              resolved = true;
+              cleanup();
               clearTimeout(timeout);
               console.log(
                 `[Deepseek Research] All credentials captured via context! (Has d_id: ${hasDeviceId}, Has ds_session_id: ${hasSessionId})`,
               );
               resolve({
                 cookie: cookieString,
-                bearer: capturedBearer,
+                bearer: capturedBearer ?? "",
                 userAgent,
               });
             } else {
