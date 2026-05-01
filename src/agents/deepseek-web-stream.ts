@@ -158,11 +158,15 @@ function buildPrompt(
 
     return historyParts.join("\n\n");
   } else {
-    const lastMsg = messages[messages.length - 1];
+    const messagesList = messages as Array<{ role: string; content: string | MessageContentPart[]; toolCallId?: string; toolName?: string }>;
+    const lastMsg = messagesList[messagesList.length - 1];
     if (lastMsg.role === "toolResult") {
-      const toolResults = messages.filter((m) => m.role === "toolResult") as ToolResultMessageWithContent[];
-      if (toolResults.length > 0) {
-        const responses = toolResults.map((tr) => {
+      const lastUserIndex = [...messagesList].toReversed().findIndex((m) => m.role === "user");
+      const cutoffIndex = lastUserIndex >= 0 ? messagesList.length - lastUserIndex : 0;
+      const currentRoundToolResults = messagesList.slice(cutoffIndex).filter((m) => m.role === "toolResult");
+      console.log(`[buildPrompt] messagesList.length=${messagesList.length}, lastUserIndex=${lastUserIndex}, cutoffIndex=${cutoffIndex}, currentRoundToolResults.length=${currentRoundToolResults.length}`);
+      if (currentRoundToolResults.length > 0) {
+        const responses = currentRoundToolResults.map((tr) => {
           let resultText = "";
           if (Array.isArray(tr.content)) {
             for (const part of tr.content) {
@@ -177,7 +181,7 @@ function buildPrompt(
       }
     }
 
-    const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
+    const lastUserMessage = [...messagesList].toReversed().find((m) => m.role === "user");
     if (lastUserMessage) {
       if (typeof lastUserMessage.content === "string") {
         return lastUserMessage.content;
@@ -737,7 +741,7 @@ export function createDeepseekWebStreamFn(
                       part.arguments = { raw: argStr };
                     }
                     const argsStr = JSON.stringify(part.arguments);
-                    const argsPreview = argsStr.length > 100 ? argsStr.slice(0, 100) + "..." : argsStr;
+                    const argsPreview = argsStr.length > 500 ? argsStr.slice(0, 500) + "..." : argsStr;
                     console.log(`🔧 ${part.name}: ${argsPreview}`);
                     stream.push({
                       type: "toolcall_end",

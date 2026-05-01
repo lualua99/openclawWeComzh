@@ -1165,11 +1165,14 @@ Writing about tools in plain text WILL NOT execute them.
 
     return historyParts.join("\n\n");
   } else {
-    const lastMsg = messages[messages.length - 1];
+    const messagesList = messages as Array<{ role: string; content: string | Array<{ type: string; text?: string }>; toolCallId?: string; toolName?: string }>;
+    const lastMsg = messagesList[messagesList.length - 1];
     if (lastMsg.role === "toolResult") {
-      const toolResults = messages.filter((m) => m.role === "toolResult") as Array<ToolResultMessage & { content: string | Array<{ type: "text"; text: string }> }>;
-      if (toolResults.length > 0) {
-        const responses = toolResults.map((tr) => {
+      const lastUserIndex = [...messagesList].toReversed().findIndex((m) => m.role === "user");
+      const cutoffIndex = lastUserIndex >= 0 ? messagesList.length - lastUserIndex : 0;
+      const currentRoundToolResults = messagesList.slice(cutoffIndex).filter((m) => m.role === "toolResult");
+      if (currentRoundToolResults.length > 0) {
+        const responses = currentRoundToolResults.map((tr) => {
           let resultText = "";
           if (Array.isArray(tr.content)) {
             for (const part of tr.content) {
@@ -1182,17 +1185,17 @@ Writing about tools in plain text WILL NOT execute them.
         }).join("\n");
         return `${responses}\n\nPlease proceed based on these tool results.`;
       }
-    } else {
-      const lastUserMessage = [...messages].toReversed().find((m) => m.role === "user");
-      if (lastUserMessage) {
-        if (typeof lastUserMessage.content === "string") {
-          return lastUserMessage.content;
-        } else if (Array.isArray(lastUserMessage.content)) {
-          return lastUserMessage.content
-            .filter((part) => part.type === "text")
-            .map((part) => (part as TextContent).text)
-            .join("");
-        }
+    }
+
+    const lastUserMessage = [...messagesList].toReversed().find((m) => m.role === "user");
+    if (lastUserMessage) {
+      if (typeof lastUserMessage.content === "string") {
+        return lastUserMessage.content;
+      } else if (Array.isArray(lastUserMessage.content)) {
+        return lastUserMessage.content
+          .filter((part) => part.type === "text")
+          .map((part) => (part as TextContent).text)
+          .join("");
       }
     }
   }
